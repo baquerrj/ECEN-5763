@@ -1,2 +1,2 @@
-# ECEN-5803
-Fall 2021 Mastering Embedded Systems Architecture
+# ECEN-5763
+Summer 2022 Embedded Machine Vision and Intelligent Automation
