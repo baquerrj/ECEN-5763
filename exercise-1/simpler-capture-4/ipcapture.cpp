@@ -1,8 +1,8 @@
 /*
  *
- *  Example by Sam Siewert 
+ *  Example by Sam Siewert
  *
- *  Updated 1/24/2022 for OpenCV 4.x for Jetson nano 2g 
+ *  Updated 1/24/2022 for OpenCV 4.x for Jetson nano 2g
  *
  */
 #include <stdio.h>
@@ -25,14 +25,15 @@ int main( int argc, char** argv )
     const std::string videoStreamAddress = "rtsp://172.19.172.216/11";
 
     //open the video stream and make sure it's opened
-    if(!vcap.open(videoStreamAddress)) {
+    if( !vcap.open( videoStreamAddress, CAP_FFMPEG ) )
+    {
         std::cout << "Error opening video stream or file" << std::endl;
         return -1;
     }
 
-    for(;;) 
+    for(;;)
     {
-        if(!vcap.read(image)) 
+        if(!vcap.read(image))
 	{
             std::cout << "No frame" << std::endl;
             cv::waitKey();
@@ -40,5 +41,5 @@ int main( int argc, char** argv )
 
         cv::imshow("Output Window", image);
         if(cv::waitKey(1) >= 0) break;
-    }   
+    }
 };
