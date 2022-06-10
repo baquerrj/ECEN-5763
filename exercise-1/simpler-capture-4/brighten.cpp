@@ -14,7 +14,7 @@ int main( int argc, char** argv )
     Mat new_image = Mat::zeros( image.size(), image.type() );
 
     // Check command line arguments
-    if(argc < 3) 
+    if(argc < 2)
     {
 	    printf("Usage: brighten <input-file>\n");
             exit(-1);
@@ -28,7 +28,7 @@ int main( int argc, char** argv )
     for( int y = 0; y < image.rows; y++ )
     {
         for( int x = 0; x < image.cols; x++ )
-        { 
+        {
             for( int c = 0; c < 3; c++ )
                 new_image.at<Vec3b>(y,x)[c] =
                     saturate_cast<uchar>( alpha*( image.at<Vec3b>(y,x)[c] ) + beta );
