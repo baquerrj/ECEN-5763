@@ -5,8 +5,8 @@
 #include <fcntl.h>
 
 
-#define IMG_HEIGHT (300)
-#define IMG_WIDTH (400)
+#define IMG_HEIGHT (372)
+#define IMG_WIDTH (580)
 
 typedef double FLOAT;
 
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     int fdin, fdout, bytesRead=0, bytesLeft, i, j;
     UINT64 microsecs=0, millisecs=0;
     FLOAT temp;
-    
+
     if(argc < 3)
     {
        printf("Usage: sharpen input_file.ppm output_file.ppm\n");
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 
     header[21]='\0';
 
-    //printf("header = %s\n", header); 
+    //printf("header = %s\n", header);
 
     // Read RGB data
     for(i=0; i<IMG_HEIGHT*IMG_WIDTH; i++)
@@ -144,5 +144,5 @@ int main(int argc, char *argv[])
 
     close(fdin);
     close(fdout);
- 
+
 }
