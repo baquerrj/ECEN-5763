@@ -12,13 +12,23 @@ CPPFLAGS = -Wall $(CPPINCLUDE_DIRS)
 LFLAGS = -Wall
 
 CPPSOURCE = CannyDetector_Demo.cpp
-CPPOUTFILE = CannyDetector_Demo
-CPPOBJS = $(CPPSOURCE:.cpp=.o)
 
-all: $(CPPOUTFILE)
+CPPBIN =
 
-$(CPPOUTFILE): $(CPPOBJS)
-	$(CPP) $(CPPFLAGS) $(CPPOBJS) -o $(CPPOUTFILE) `pkg-config --libs opencv` $(CPPLIBS)
+BIN = ./bin
+$(shell mkdir -p $(BIN) &> /dev/null)
+BUILD = ./build
+$(shell mkdir -p $(BUILD) &> /dev/null)
+
+.PRECIOUS : $(BUILD)/%.o
+
+all: $(BIN)/CannyDetector_Demo
+
+$(BUILD)/%.o : %.cpp
+	$(CPP) $(CPPFLAGS) -c -o $@ $<
+
+$(BIN)/%: $(BUILD)/%.o
+	$(CPP) $(CPPFLAGS) $< -o $@ `pkg-config --libs opencv` $(CPPLIBS)
 
 clean:
-	rm -f *.o $(CPPOUTFILE)
+	rm -rf $(BIN) $(BUILD)
