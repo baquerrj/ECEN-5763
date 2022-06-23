@@ -25,13 +25,72 @@ const int max_lowThreshold = 100;
 const int cannyRatio = 3;
 const int kernel_size = 3;
 
-Mat dst, detected_edges;
+
+class EdgeDetector
+{
+    public:
+    EdgeDetector() {}
+    ~EdgeDetector() {}
+
+    void applyCanny();
+
+    void applySobel();
+
+    void showImage( bool original );
+    int openImage( String name );
+
+    void setSourceImage( Mat &source );
+    void setDestinationImage( Mat &destination );
+
+    private:
+    Mat mySource;
+    Mat myDestination;
+    Mat detected_edges;
+    String myWindowName;
+};
+
+void EdgeDetector::showImage( bool original )
+{
+    if( original )
+    {
+        imshow( myWindowName, mySource );
+    }
+    else
+    {
+        imshow( myWindowName, myDestination );
+    }
+}
+int EdgeDetector::openImage( String name )
+{
+    myWindowName = name;
+    mySource = imread( name, IMREAD_COLOR );
+    if( mySource.empty() )
+    {
+        printf( "Error opening image: %s\n", myWindowName.c_str() );
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+void EdgeDetector::setDestinationImage( Mat &destination )
+{
+    myDestination = destination;
+}
+
+void EdgeDetector::setSourceImage( Mat &source )
+{
+    mySource = source;
+}
 
 // static void CannyThreshold( int, void* )
-void applyCanny( Mat * src, Mat * dst )
+// void applyCanny( Mat* src, Mat* myDestination )
+void EdgeDetector::applyCanny()
 {
     Mat src_gray;
-    cvtColor( *src, src_gray, COLOR_BGR2GRAY );
+    cvtColor( mySource, src_gray, COLOR_BGR2GRAY );
 
     //![reduce_noise]
     /// Reduce noise with a kernel 3x3
@@ -45,30 +104,32 @@ void applyCanny( Mat * src, Mat * dst )
 
     /// Using Canny's output as a mask, we display our result
     //![fill]
-    // dst = Scalar::all( 0 );
+    // myDestination = Scalar::all( 0 );
     //![fill]
 
     //![copyto]
-    src->copyTo( *dst, detected_edges );
+    mySource.copyTo( myDestination, detected_edges );
     //![copyto]
 
     //![display]
-    // imshow( windowName, dst );
+    // imshow( windowName, myDestination );
     //![display]
 }
 
-void applySobel( Mat* image, Mat* grad )
+// void applySobel( Mat* image, Mat* grad )
+void EdgeDetector::applySobel()
 {
-    Mat src;
+    // Mat src;
     Mat src_gray;
+    Mat gray;
     //![reduce_noise]
     // Remove noise by blurring with a Gaussian filter ( kernel size = 3 )
-    GaussianBlur( *image, src, Size( 3, 3 ), 0, 0, BORDER_DEFAULT );
+    GaussianBlur( mySource, gray, Size( 3, 3 ), 0, 0, BORDER_DEFAULT );
     //![reduce_noise]
 
     //![convert_to_gray]
     // Convert the image to grayscale
-    cvtColor( src, src_gray, COLOR_BGR2GRAY );
+    cvtColor( mySource, src_gray, COLOR_BGR2GRAY );
     //![convert_to_gray]
 
     //![sobel]
@@ -91,7 +152,7 @@ void applySobel( Mat* image, Mat* grad )
 
     //![blend]
     /// Total Gradient (approximate)
-    addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, *grad );
+    addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, myDestination );
 }
 
 int main( int argc, char** argv )
@@ -108,21 +169,21 @@ int main( int argc, char** argv )
         return 0;
     }
 
-    String imageName = parser.get<String>( "@input" );
+    EdgeDetector edgeDetector;
 
-    Mat src;
-    Mat dst;
-    src = imread( imageName, IMREAD_COLOR );
-    if( src.empty() )
+    String imageName = parser.get<String>( "@input" );
+    int ret = edgeDetector.openImage( imageName );
+
+    if( ret == 1 )
     {
-        printf( "Error opening image: %s\n", imageName.c_str() );
         return 1;
     }
-    imshow( windowName, src );
+
+    edgeDetector.showImage( true );
 
     while( true )
     {
-        // applySobel( &src, &dst );
+        // applySobel( &src, &myDestination );
         char key = (char)waitKey( 0 );
 
         if( key == 27 )
@@ -131,17 +192,17 @@ int main( int argc, char** argv )
         }
         else if( key == 'C' || key == 'c' )
         {
-            applyCanny( &src, &dst );
-            imshow( windowName, dst );
+            edgeDetector.applyCanny(  );
+            edgeDetector.showImage( false );
         }
         else if( key == 'S' || key == 's' )
         {
-            applySobel( &src, &dst );
-            imshow( windowName, dst );
+            edgeDetector.applySobel(  );
+            edgeDetector.showImage( false );
         }
         else if( key == 'N' || key == 'n' )
         {
-            imshow( windowName, src );
+            edgeDetector.showImage( true );
         }
     }
     return 0;
