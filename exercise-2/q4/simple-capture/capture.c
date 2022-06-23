@@ -32,6 +32,7 @@
 #include <linux/videodev2.h>
 
 #include <time.h>
+#include <syslog.h>
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define COLOR_CONVERT
@@ -480,6 +481,8 @@ static void mainloop(void)
     printf( "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
     printf( "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
 
+    syslog( LOG_CRIT, "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+    syslog( LOG_CRIT, "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
 }
 
 static void stop_capturing(void)
