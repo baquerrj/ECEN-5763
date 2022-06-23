@@ -25,65 +25,113 @@ const int max_lowThreshold = 100;
 const int cannyRatio = 3;
 const int kernel_size = 3;
 
+enum detector_e
+{
+    CANNY,
+    SOBEL,
+    NONE
+};
 
 class EdgeDetector
 {
-    public:
-    EdgeDetector() {}
+public:
+    EdgeDetector( int deviceId = 0, int frameWidth = 640, int frameHeight = 480 )
+    {
+        myCamera = VideoCapture( deviceId );
+        if( !myCamera.isOpened() )
+        {
+            printf( "Error opening camera %d\n\r", deviceId );
+            exit( -1 );
+        }
+        myCamera.set( CAP_PROP_FRAME_WIDTH, frameWidth );
+        myCamera.set( CAP_PROP_FRAME_HEIGHT, frameHeight );
+
+        currentDetector = NONE;
+
+    }
     ~EdgeDetector() {}
+
+    inline void readCameraFrame()
+    {
+        myCamera.read( mySource );
+    }
+
+    inline void setCurrentDetector( detector_e detection )
+    {
+        currentDetector = detection;
+    }
 
     void applyCanny();
 
     void applySobel();
 
-    void showImage( bool original );
-    int openImage( String name );
+    inline void applyTransformation()
+    {
+        switch( currentDetector )
+        {
+            case CANNY:
+                applyCanny();
+                myImageToShow = myDestination;
+                break;
+            case SOBEL:
+                applySobel();
+                myImageToShow = myDestination;
+                break;
+            case NONE:
+            default:
+                myImageToShow = mySource;
+                break;
+        }
+    }
 
-    void setSourceImage( Mat &source );
-    void setDestinationImage( Mat &destination );
+    inline void showImage( bool original = true )
+    {
+        imshow( myWindowName, myImageToShow );
+        // if( original )
+        // {
+        //     imshow( myWindowName, mySource );
+        // }
+        // else
+        // {
+        //     imshow( myWindowName, myDestination );
+        // }
+    }
 
-    private:
+    inline int openImage( String name )
+    {
+        myWindowName = name;
+        mySource = imread( name, IMREAD_COLOR );
+        if( mySource.empty() )
+        {
+            printf( "Error opening image: %s\n", myWindowName.c_str() );
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    inline void setSourceImage( Mat& source )
+    {
+        mySource = source;
+    }
+
+    inline void setDestinationImage( Mat& destination )
+    {
+        myDestination = destination;
+    }
+
+private:
+    detector_e currentDetector;
     Mat mySource;
     Mat myDestination;
     Mat detected_edges;
+    Mat myImageToShow;
     String myWindowName;
+    VideoCapture myCamera;
 };
 
-void EdgeDetector::showImage( bool original )
-{
-    if( original )
-    {
-        imshow( myWindowName, mySource );
-    }
-    else
-    {
-        imshow( myWindowName, myDestination );
-    }
-}
-int EdgeDetector::openImage( String name )
-{
-    myWindowName = name;
-    mySource = imread( name, IMREAD_COLOR );
-    if( mySource.empty() )
-    {
-        printf( "Error opening image: %s\n", myWindowName.c_str() );
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
-void EdgeDetector::setDestinationImage( Mat &destination )
-{
-    myDestination = destination;
-}
-
-void EdgeDetector::setSourceImage( Mat &source )
-{
-    mySource = source;
-}
 
 // static void CannyThreshold( int, void* )
 // void applyCanny( Mat* src, Mat* myDestination )
@@ -158,7 +206,7 @@ void EdgeDetector::applySobel()
 int main( int argc, char** argv )
 {
     cv::CommandLineParser parser( argc, argv,
-                                  "{@input   |../data/lena.jpg|input image}"
+                                  //   "{@input   |../data/lena.jpg|input image}"
                                   "{help    h|false|show help message}" );
     bool help = parser.get<bool>( "help" );
     if( help )
@@ -169,22 +217,33 @@ int main( int argc, char** argv )
         return 0;
     }
 
-    EdgeDetector edgeDetector;
+    EdgeDetector edgeDetector( 0, 640, 480 );
 
-    String imageName = parser.get<String>( "@input" );
-    int ret = edgeDetector.openImage( imageName );
-
-    if( ret == 1 )
-    {
-        return 1;
-    }
+    // if( true == parser.has( "@input" ) )
+    // {
+    //     String imageName = parser.get<String>( "@input" );
+    //     int ret = edgeDetector.openImage( imageName );
+    //     if( ret == 1 )
+    //     {
+    //         return 1;
+    //     }
+    // }
+    // else
+    // {
+    edgeDetector.readCameraFrame();
+    // }
+    edgeDetector.applyTransformation();
 
     edgeDetector.showImage( true );
 
     while( true )
     {
+        edgeDetector.readCameraFrame();
+        edgeDetector.applyTransformation();
+        edgeDetector.showImage();
+
         // applySobel( &src, &myDestination );
-        char key = (char)waitKey( 0 );
+        char key = (char)waitKey( 1 );
 
         if( key == 27 )
         {
@@ -192,17 +251,20 @@ int main( int argc, char** argv )
         }
         else if( key == 'C' || key == 'c' )
         {
-            edgeDetector.applyCanny(  );
-            edgeDetector.showImage( false );
+            edgeDetector.setCurrentDetector( CANNY );
+            // edgeDetector.applyCanny();
+            // edgeDetector.showImage( false );
         }
         else if( key == 'S' || key == 's' )
         {
-            edgeDetector.applySobel(  );
-            edgeDetector.showImage( false );
+            edgeDetector.setCurrentDetector( SOBEL );
+            // edgeDetector.applySobel();
+            // edgeDetector.showImage( false );
         }
         else if( key == 'N' || key == 'n' )
         {
-            edgeDetector.showImage( true );
+            edgeDetector.setCurrentDetector( NONE );
+            // edgeDetector.showImage( true );
         }
     }
     return 0;
