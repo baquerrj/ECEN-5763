@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <time.h>
+#include <syslog.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -68,7 +69,7 @@ int main()
     cam0.set( CAP_PROP_FRAME_WIDTH, 640 );
     cam0.set( CAP_PROP_FRAME_HEIGHT, 480 );
 
-    while( 1 )
+    while( framesProcessed < 2000 )
     {
         framesProcessed++;
         clock_gettime( CLOCK_REALTIME, &start );
@@ -76,11 +77,9 @@ int main()
         cam0.read( frame );
         imshow( "video_display", frame );
         clock_gettime( CLOCK_REALTIME, &stop );
-        double tmp = delta_t( &stop, &start );
-        deltas += tmp;
+        deltas += delta_t( &stop, &start );
 
         if( ( winInput = waitKey( 10 ) ) == ESCAPE_KEY )
-            //if ((winInput = waitKey(0)) == ESCAPE_KEY)
         {
             break;
         }
@@ -97,4 +96,7 @@ int main()
     deltaT = deltaT / 1000.0;
     printf( "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
     printf( "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+
+    syslog( LOG_CRIT, "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+    syslog( LOG_CRIT, "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
 };
