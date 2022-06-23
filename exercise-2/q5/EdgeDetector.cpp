@@ -25,6 +25,8 @@ const int max_lowThreshold = 100;
 const int cannyRatio = 3;
 const int kernel_size = 3;
 
+const int maxKsize = 31;
+
 enum detector_e
 {
     CANNY,
@@ -48,6 +50,10 @@ public:
 
         currentDetector = NONE;
 
+        myKsize = ksize;
+        myScale = scale;
+        myDelta = delta;
+
     }
     ~EdgeDetector() {}
 
@@ -68,6 +74,12 @@ public:
         {
             createTrackbar( "Min Threshold:", myWindowName, &lowThreshold, max_lowThreshold, updateThreshold, this );
         }
+        else if( currentDetector == SOBEL )
+        {
+            createTrackbar( "ksize", myWindowName, &ksize, maxKsize, updateKsize, this );
+            createTrackbar( "scale", myWindowName, &scale, 100, updateScale, this );
+            createTrackbar( "delta", myWindowName, &delta, 100, updateDelta, this );
+        }
     }
 
     inline static void updateThreshold( int newValue, void* object )
@@ -77,10 +89,53 @@ public:
         ed->setCannyThreshold( newValue );
     }
 
+    inline static void updateKsize( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setKsize( newValue );
+    }
+
+    inline static void updateScale( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setScale( newValue );
+    }
+
+    inline static void updateDelta( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setDelta( newValue );
+    }
+
     inline void setCannyThreshold( int value )
     {
         myThreshold = value;
     }
+
+    inline void setKsize( int value )
+    {
+        if( value % 2 == 0 )
+        {
+            myKsize = value + 1;
+            setTrackbarPos( "ksize", myWindowName, myKsize );
+        }
+        else
+        {
+            myKsize = value;
+        }
+    }
+    inline void setScale( int value )
+    {
+        myScale = value;
+    }
+    inline void setDelta( int value )
+    {
+        myDelta = value;
+    }
+
     void applyCanny();
 
     void applySobel();
@@ -141,6 +196,9 @@ private:
     String myWindowName;
     VideoCapture myCamera;
     int myThreshold;
+    int myKsize;
+    int myScale;
+    int myDelta;
 };
 
 
@@ -198,10 +256,10 @@ void EdgeDetector::applySobel()
     Mat abs_grad_x, abs_grad_y;
 
     /// Gradient X
-    Sobel( src_gray, grad_x, ddepth, 1, 0, ksize, scale, delta, BORDER_DEFAULT );
+    Sobel( src_gray, grad_x, ddepth, 1, 0, myKsize, myScale, myDelta, BORDER_DEFAULT );
 
     /// Gradient Y
-    Sobel( src_gray, grad_y, ddepth, 0, 1, ksize, scale, delta, BORDER_DEFAULT );
+    Sobel( src_gray, grad_y, ddepth, 0, 1, myKsize, myScale, myDelta, BORDER_DEFAULT );
     //![sobel]
 
     //![convert]
