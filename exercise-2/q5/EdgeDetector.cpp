@@ -59,8 +59,28 @@ public:
     inline void setCurrentDetector( detector_e detection )
     {
         currentDetector = detection;
+        updateTrackbar();
     }
 
+    inline void updateTrackbar()
+    {
+        if( currentDetector == CANNY )
+        {
+            createTrackbar( "Min Threshold:", myWindowName, &lowThreshold, max_lowThreshold, updateThreshold, this );
+        }
+    }
+
+    inline static void updateThreshold( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*) object;
+
+        ed->setCannyThreshold( newValue );
+    }
+
+    inline void setCannyThreshold( int value )
+    {
+        myThreshold = value;
+    }
     void applyCanny();
 
     void applySobel();
@@ -112,16 +132,6 @@ public:
         }
     }
 
-    inline void setSourceImage( Mat& source )
-    {
-        mySource = source;
-    }
-
-    inline void setDestinationImage( Mat& destination )
-    {
-        myDestination = destination;
-    }
-
 private:
     detector_e currentDetector;
     Mat mySource;
@@ -130,6 +140,7 @@ private:
     Mat myImageToShow;
     String myWindowName;
     VideoCapture myCamera;
+    int myThreshold;
 };
 
 
@@ -147,12 +158,13 @@ void EdgeDetector::applyCanny()
 
     //![canny]
     /// Canny detector
-    Canny( detected_edges, detected_edges, lowThreshold, lowThreshold * cannyRatio, kernel_size );
+    printf( "myThreshold: %d\n", myThreshold );
+    Canny( detected_edges, detected_edges, myThreshold, myThreshold * cannyRatio, kernel_size );
     //![canny]
 
     /// Using Canny's output as a mask, we display our result
     //![fill]
-    // myDestination = Scalar::all( 0 );
+    myDestination = Scalar::all( 0 );
     //![fill]
 
     //![copyto]
