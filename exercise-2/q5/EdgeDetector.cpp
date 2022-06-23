@@ -9,6 +9,7 @@
 #include "opencv2/highgui.hpp"
 
 #include <iostream>
+#include <time.h>
 
 using namespace cv;
 using namespace std;
@@ -26,6 +27,15 @@ const int cannyRatio = 3;
 const int kernel_size = 3;
 
 const int maxKsize = 31;
+
+double delta_t( struct timespec* stop, struct timespec* start )
+{
+    double current = ( (double)stop->tv_sec * 1000.0 ) +
+        ( (double)( (double)stop->tv_nsec / 1000000.0 ) );
+    double last = ( (double)start->tv_sec * 1000.0 ) +
+        ( (double)( (double)start->tv_nsec / 1000000.0 ) );
+    return ( current - last );
+}
 
 
 class EdgeDetector
@@ -81,9 +91,9 @@ public:
     inline void createTrackbars()
     {
         createTrackbar( "Canny Threshold:", myWindowName, &lowThreshold, max_lowThreshold, updateThreshold, this );
-        createTrackbar( "Sobel Kernel Size", myWindowName, &ksize, maxKsize, updateKsize, this );
-        createTrackbar( "Sobel Scale", myWindowName, &scale, 100, updateScale, this );
-        createTrackbar( "Sobel Delta", myWindowName, &delta, 100, updateDelta, this );
+        createTrackbar( "Sobel Kernel Size:", myWindowName, &ksize, maxKsize, updateKsize, this );
+        createTrackbar( "Sobel Scale:", myWindowName, &scale, 100, updateScale, this );
+        createTrackbar( "Sobel Delta:", myWindowName, &delta, 100, updateDelta, this );
     }
 
     inline static void updateThreshold( int newValue, void* object )
@@ -124,7 +134,7 @@ public:
         if( value % 2 == 0 )
         {
             myKsize = value + 1;
-            setTrackbarPos( "ksize", myWindowName, myKsize );
+            setTrackbarPos( "Sobel Kernel Size:", myWindowName, myKsize );
         }
         else
         {
@@ -140,6 +150,35 @@ public:
         myDelta = value;
     }
 
+    inline void process()
+    {
+        // readCameraFrame();
+        applyTransformation();
+    }
+
+    inline void printAverageFrameRates()
+    {
+        double deltaT = deltasCanny / framesCanny;
+        deltaT = deltaT / 1000.0;
+        printf( "****************** CANNY * *****************\n\r" );
+        printf( "Processed %d frames in %3.4f seconds\n\r", framesCanny, deltasCanny / 1000.0 );
+        printf( "Canny Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+        printf( "Canny Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+
+        deltaT = deltasSobel / framesSobel;
+        deltaT = deltaT / 1000.0;
+        printf( "****************** SOBEL * *****************\n\r" );
+        printf( "Processed %d frames in %3.4f seconds\n\r", framesSobel, deltasSobel / 1000.0 );
+        printf( "Sobel Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+        printf( "Sobel Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+
+        deltaT = deltasNone / framesNone;
+        deltaT = deltaT / 1000.0;
+        printf( "****************** NONE * *****************\n\r" );
+        printf( "Processed %d frames in %3.4f seconds\n\r", framesNone, deltasNone / 1000.0 );
+        printf( "None Edge Detection Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+        printf( "None Edge Detection Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    }
     void applyCanny();
 
     void applySobel();
@@ -149,16 +188,34 @@ public:
         switch( currentDetector )
         {
             case CANNY:
+                clock_gettime( CLOCK_REALTIME, &start );
+                readCameraFrame();
                 applyCanny();
                 myImageToShow = myDestination;
+                showImage();
+                clock_gettime( CLOCK_REALTIME, &stop );
+                deltasCanny += delta_t( &stop, &start );
+                framesCanny++;
                 break;
             case SOBEL:
+                clock_gettime( CLOCK_REALTIME, &start );
+                readCameraFrame();
                 applySobel();
                 myImageToShow = myDestination;
+                showImage();
+                clock_gettime( CLOCK_REALTIME, &stop );
+                deltasSobel += delta_t( &stop, &start );
+                framesSobel++;
                 break;
             case NONE:
             default:
+                clock_gettime( CLOCK_REALTIME, &start );
+                readCameraFrame();
                 myImageToShow = mySource;
+                showImage();
+                clock_gettime( CLOCK_REALTIME, &stop );
+                deltasNone += delta_t( &stop, &start );
+                framesNone++;
                 break;
         }
     }
@@ -190,6 +247,17 @@ private:
     int myKsize;
     int myScale;
     int myDelta;
+
+    struct timespec start;
+    struct timespec stop;
+
+    double deltasCanny;
+    double deltasSobel;
+    double deltasNone;
+
+    int framesCanny;
+    int framesSobel;
+    int framesNone;
 };
 
 void EdgeDetector::applyCanny()
@@ -255,14 +323,12 @@ int main( int argc, char** argv )
 
     EdgeDetector * edgeDetector = new EdgeDetector();
 
-    edgeDetector->readCameraFrame();
-    edgeDetector->applyTransformation();
+    edgeDetector->process();
     edgeDetector->showImage();
 
     while( true )
     {
-        edgeDetector->readCameraFrame();
-        edgeDetector->applyTransformation();
+        edgeDetector->process();
         edgeDetector->showImage();
 
         char key = (char)waitKey( 1 );
@@ -285,9 +351,14 @@ int main( int argc, char** argv )
         }
     }
 
+    destroyAllWindows();
+
+    edgeDetector->printAverageFrameRates();
+
     if( edgeDetector )
     {
         delete edgeDetector;
     }
+
     return 0;
 }
