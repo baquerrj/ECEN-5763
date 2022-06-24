@@ -56,7 +56,7 @@ int main()
     struct timespec stop = { 0, 0 };
     double deltas = 0.0;
     int framesProcessed = 0;
-    clock_gettime(CLOCK_REALTIME, &mainStart);
+    clock_gettime( CLOCK_REALTIME, &mainStart );
     VideoCapture cam0( 0 );
     namedWindow( "video_display" );
     char winInput;
@@ -69,11 +69,12 @@ int main()
     cam0.set( CAP_PROP_FRAME_WIDTH, 640 );
     cam0.set( CAP_PROP_FRAME_HEIGHT, 480 );
 
+    Mat frame;
+
     while( framesProcessed < 2000 )
     {
         framesProcessed++;
         clock_gettime( CLOCK_REALTIME, &start );
-        Mat frame;
         cam0.read( frame );
         imshow( "video_display", frame );
         clock_gettime( CLOCK_REALTIME, &stop );
@@ -92,11 +93,18 @@ int main()
 
     destroyWindow( "video_display" );
 
-    double deltaT = deltas / framesProcessed;
-    deltaT = deltaT / 1000.0;
-    printf( "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
-    printf( "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    clock_gettime( CLOCK_REALTIME, &mainStop );
+    imwrite( "frame.jpg", frame, { IMWRITE_JPEG_QUALITY, 50 } );
+    double runtime = delta_t( &mainStop, &mainStart );
 
-    syslog( LOG_CRIT, "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
-    syslog( LOG_CRIT, "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    double deltaTMS = deltas / framesProcessed;
+    double deltaT = deltaTMS / 1000.0;
+    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
+    syslog( LOG_INFO, "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    syslog( LOG_INFO, "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
+    printf( "Runtime: %3.2f seconds\n\r", runtime / 1000.0 );
+
 };

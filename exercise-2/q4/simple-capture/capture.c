@@ -476,13 +476,14 @@ static void mainloop(void)
         if(count <= 0) break;
     }
 
-    double deltaT = deltas / framesProcessed;
-    deltaT = deltaT / 1000.0;
-    printf( "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
-    printf( "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    double deltaTMS = deltas / framesProcessed;
+    double deltaT = deltaTMS / 1000.0;
+    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
 
-    syslog( LOG_CRIT, "Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
-    syslog( LOG_CRIT, "Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    syslog( LOG_INFO, "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    syslog( LOG_INFO, "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
 }
 
 static void stop_capturing(void)
@@ -982,7 +983,7 @@ int main(int argc, char **argv)
     mainloop();
     clock_gettime( CLOCK_REALTIME, &stop );
     double runtime = delta_t( &stop, &start );
-    printf( "Runtime: %3.4f seconds\n\r", runtime / 1000.0 );
+    printf( "Runtime: %3.2f seconds\n\r", runtime / 1000.0 );
     stop_capturing();
     uninit_device();
     close_device();
