@@ -9,6 +9,15 @@
 using namespace cv;
 using namespace std;
 
+double delta_t( struct timespec* stop, struct timespec* start )
+{
+    double current = ( (double)stop->tv_sec * 1000.0 ) +
+        ( (double)( (double)stop->tv_nsec / 1000000.0 ) );
+    double last = ( (double)start->tv_sec * 1000.0 ) +
+        ( (double)( (double)start->tv_nsec / 1000000.0 ) );
+    return ( current - last );
+}
+
 void applyHoughCircles( Mat * src )
 {
     //![convert_to_gray]
@@ -45,23 +54,42 @@ void applyHoughCircles( Mat * src )
 
 int main(int argc, char** argv)
 {
-    //![load]
-    const char* filename = argc >=2 ? argv[1] : "smarties.png";
+    VideoCapture cam0( 0 );
 
-    // Loads an image
-    Mat src = imread( filename, IMREAD_COLOR );
-
-    // Check if image is loaded fine
-    if(src.empty()){
-        printf(" Error opening image\n");
-        printf(" Program Arguments: [image_name -- default %s] \n", filename);
-        return -1;
+    if( !cam0.isOpened() )
+    {
+        exit( -1 );
     }
-    //![load]
 
-    applyHoughCircles( &src );
+    cam0.set( CAP_PROP_FRAME_WIDTH, 640 );
+    cam0.set( CAP_PROP_FRAME_HEIGHT, 480 );
+
+    char winInput;
+
+    Mat src;
+    // used to calculate fps in while-loop
+    struct timespec start = { 0, 0 };
+    struct timespec stop = { 0, 0 };
+    double deltas = 0.0;
+
+    int framesProcessed = 0;
+
+    while( true )
+    {
+        cam0.read( src );
+        clock_gettime( CLOCK_REALTIME, &start );
+        applyHoughCircles( &src );
+        clock_gettime( CLOCK_REALTIME, &stop );
+        deltas += delta_t( &stop, &start );
+        framesProcessed++;
+        imshow( "detected circles", src );
+
+        if( ( winInput = waitKey( 10 ) ) == 27 )
+        {
+            break;
+        }
+    }
     //![display]
-    imshow("detected circles", src);
     waitKey();
     //![display]
 
