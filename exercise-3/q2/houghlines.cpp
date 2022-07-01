@@ -2,6 +2,8 @@
  * @file houghclines.cpp
  * @brief This program demonstrates line finding with the Hough transform
  */
+#include <stdio.h>
+#include <time.h>
 
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -10,7 +12,17 @@
 using namespace cv;
 using namespace std;
 
-void applyHoughlines( Mat * src, Mat * dst, Mat * cdst, Mat * cdstP )
+double delta_t( struct timespec* stop, struct timespec* start )
+{
+    double current = ( (double)stop->tv_sec * 1000.0 ) +
+        ( (double)( (double)stop->tv_nsec / 1000000.0 ) );
+    double last = ( (double)start->tv_sec * 1000.0 ) +
+        ( (double)( (double)start->tv_nsec / 1000000.0 ) );
+    return ( current - last );
+}
+
+void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
+// Mat applyHoughlines( Mat * src, Mat * dst, Mat * cdst )
 {
     //![edge_detection]
        // Edge detection
@@ -64,33 +76,51 @@ int main(int argc, char** argv)
     // Declare the output variables
     Mat dst, cdst, cdstP;
 
-    //![load]
-    const char* default_file = "sudoku.png";
-    const char* filename = argc >=2 ? argv[1] : default_file;
+    VideoCapture cam0( 0 );
 
-    // Loads an image
-    Mat src = imread( filename, IMREAD_GRAYSCALE );
-
-    // Check if image is loaded fine
-    if(src.empty()){
-        printf(" Error opening image\n");
-        printf(" Program Arguments: [image_name -- default %s] \n", default_file);
-        return -1;
+    if( !cam0.isOpened() )
+    {
+        exit(-1);
     }
-    //![load]
 
-    applyHoughlines( &src, &dst, &cdst, &cdstP );
+    cam0.set( CAP_PROP_FRAME_WIDTH, 640 );
+    cam0.set( CAP_PROP_FRAME_HEIGHT, 480 );
 
-    //![imshow]
-    // Show results
-    imshow("Source", src);
-    imshow("Detected Lines (in red) - Standard Hough Line Transform", cdst);
-    imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP);
-    //![imshow]
+    char winInput;
 
-    //![exit]
-    // Wait and Exit
-    waitKey();
+    Mat src;
+    // used to calculate fps in while-loop
+    struct timespec start = { 0, 0 };
+    struct timespec stop = { 0, 0 };
+    double deltas = 0.0;
+
+    int framesProcessed = 0;
+
+    while( true )
+    {
+        cam0.read( src );
+        clock_gettime( CLOCK_REALTIME, &start );
+        applyHoughlines( &src, &dst, &cdst , &cdstP );
+        clock_gettime( CLOCK_REALTIME, &stop );
+        deltas += delta_t( &stop, &start );
+        framesProcessed++;
+
+        //![imshow]
+        // Show results
+        imshow("Source", src);
+        imshow("Detected Lines (in red) - Standard Hough Line Transform", cdst);
+        imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP);
+        //![imshow]
+        if( ( winInput = waitKey( 10 ) ) == 27 )
+        {
+            break;
+        }
+    }
+
+    double deltaTMS = deltas / framesProcessed;
+    double deltaT = deltaTMS / 1000.0;
+    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
     return 0;
-    //![exit]
 }
