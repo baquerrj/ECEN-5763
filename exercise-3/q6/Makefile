@@ -3,7 +3,7 @@
 #
 
 CPPINCLUDE_DIRS =  -I. -I/usr/include/opencv2 -I/usr/include/opencv4 -I/usr/include/opencv
-CPPLIBS = -L/usr/lib
+CPPLIBS = -L/usr/lib/
 LIBS =
 
 CPP = g++
@@ -11,7 +11,7 @@ CFLAGS = -Wall -c -I.
 CPPFLAGS = -Wall $(CPPINCLUDE_DIRS)
 LFLAGS = -Wall
 
-CPPSOURCE = laserspot.cpp
+CPPSOURCE = commarker.cpp
 
 CPPBIN =
 
@@ -22,7 +22,7 @@ $(shell mkdir -p $(BUILD) &> /dev/null)
 
 .PRECIOUS : $(BUILD)/%.o
 
-all: $(BIN)/laserspot
+all: $(BIN)/commarker
 
 $(BUILD)/%.o : %.cpp
 	$(CPP) $(CPPFLAGS) -c -o $@ $<
