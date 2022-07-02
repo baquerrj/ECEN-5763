@@ -2,8 +2,9 @@
 # Basic OpenCV example tested on Ubuntu
 #
 
-CPPINCLUDE_DIRS =  -I. -I/usr/local/include/opencv2 -I/usr/local/include/opencv4 -I/usr/local/include/opencv
-CPPLIBS = -L/usr/local/lib -lopencv_core -lopencv_flann -lopencv_video
+CPPINCLUDE_DIRS =  -I. -I/usr/include/opencv2 -I/usr/include/opencv4 -I/usr/include/opencv
+#CPPLIBS = -L/usr/lib -lopencv_core -lopencv_flann -lopencv_video
+CPPLIBS = -L/usr/lib
 LIBS =
 
 CPP = g++
@@ -28,7 +29,7 @@ $(BUILD)/%.o : %.cpp
 	$(CPP) $(CPPFLAGS) -c -o $@ $<
 
 $(BIN)/%: $(BUILD)/%.o
-	$(CPP) $(CPPFLAGS) $< -o $@ `pkg-config --libs opencv` $(CPPLIBS)
+	$(CPP) $(CPPFLAGS) $< -o $@ `pkg-config --libs opencv4` $(CPPLIBS)
 
 clean:
 	rm -rf $(BIN) $(BUILD)
