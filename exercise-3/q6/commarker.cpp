@@ -153,7 +153,7 @@ int main( int argc, char** argv )
 {
 
     CommandLineParser parser( argc, argv,
-                              "{@input | ../q5/PGM_out/ | input video}" );
+                              "{@input | ../q5/output/ | input video}" );
 
     String directory = parser.get<String>( "@input" );
     char winInput;

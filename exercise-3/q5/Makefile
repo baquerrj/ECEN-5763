@@ -20,7 +20,7 @@ $(shell mkdir -p $(BIN) &> /dev/null)
 BUILD = ./build
 $(shell mkdir -p $(BUILD) &> /dev/null)
 
-$(shell mkdir -p PGM_out/ &> /dev/null)
+$(shell mkdir -p output/ &> /dev/null)
 
 .PRECIOUS : $(BUILD)/%.o
 
@@ -34,4 +34,4 @@ $(BIN)/%: $(BUILD)/%.o
 
 clean:
 	rm -rf $(BIN) $(BUILD)
-	rm -f PGM_out/*
+	rm -f output/*

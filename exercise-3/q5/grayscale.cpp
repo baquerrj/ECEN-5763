@@ -17,8 +17,6 @@ int main( int argc, char** argv )
 
     VideoCapture capture( parser.get<String>( "@input" ) );
 
-    Size frameSize = Size( (int)capture.get( CAP_PROP_FRAME_WIDTH ), (int)capture.get( CAP_PROP_FRAME_HEIGHT ) );
-
     if( !capture.isOpened() )
     {
         printf( "Coult not open input video stream!\n\r" );
@@ -26,11 +24,9 @@ int main( int argc, char** argv )
     }
 
     Mat frame;
-    capture.read( frame );
     int framesProcessed = 0;
 
-    int numberOfChannels = frame.channels();
-    Mat frameBGR[numberOfChannels];
+    Mat bgr[3];
 
     char winInput;
 
@@ -63,13 +59,11 @@ int main( int argc, char** argv )
                 }
             }
         }
-        sprintf( filename, "./color/frame%04d.ppm", framesProcessed );
-        imwrite( filename, frame, compression_params );
-        sprintf( filename, "./PGM_out/frame%04d_out.pgm", framesProcessed );
-        split( new_image, frameBGR );
-        imwrite( filename, frameBGR[0], compression_params );
+        sprintf( filename, "./output/frame%04d_out.pgm", framesProcessed );
+        split( new_image, bgr );
+        imwrite( filename, bgr[1], compression_params );
 
-        imshow( currentFrame, frameBGR[0] );
+        imshow( currentFrame, bgr[1] );
         framesProcessed++;
 
         winInput = waitKey( 1 );
