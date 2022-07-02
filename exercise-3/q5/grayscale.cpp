@@ -10,26 +10,14 @@
 using namespace cv;
 using namespace std;
 
-
 int main( int argc, char** argv )
 {
-
     CommandLineParser parser( argc, argv,
-                              "{@input | ../Dark-Room-Laser-Spot-with-Clutter.mpeg | input video}" );
+                              "{@input | ../Dark-Room-Laser-Spot.mpeg | input video}" );
 
-    VideoCapture capture( parser.get<String>( "@input") );
+    VideoCapture capture( parser.get<String>( "@input" ) );
 
     Size frameSize = Size( (int)capture.get( CAP_PROP_FRAME_WIDTH ), (int)capture.get( CAP_PROP_FRAME_HEIGHT ) );
-
-    VideoWriter video;
-    video.open( "processed.mp4", VideoWriter::fourcc( 'M', 'P', '4', 'V' ),
-                capture.get( CAP_PROP_FPS ), frameSize, true );
-
-    if( !video.isOpened() )
-    {
-        printf( "Could not open output video stream!\n\r" );
-        exit( -1 );
-    }
 
     if( !capture.isOpened() )
     {
@@ -51,7 +39,9 @@ int main( int argc, char** argv )
     namedWindow( currentFrame, WINDOW_GUI_NORMAL );
 
     char filename[100];
-
+    vector<int> compression_params;
+    compression_params.push_back( IMWRITE_PXM_BINARY );
+    compression_params.push_back( 1 );
     while( true )
     {
         capture.read( frame );
@@ -61,16 +51,28 @@ int main( int argc, char** argv )
             break;
         }
 
-        split( frame, frameBGR );
+        Mat new_image = Mat::zeros( frame.size(), frame.type() );
 
-        sprintf(filename, "./output/grayscale_frame_%04d.pgm", framesProcessed );
-        imwrite(filename, frameBGR[0]);
-        video.write( frameBGR[0] );
+        for( int y = 0; y < frame.rows; y++ )
+        {
+            for( int x = 0; x < frame.cols; x++ )
+            {
+                for( int c = 0; c < 3; c++ )
+                {
+                    new_image.at<Vec3b>( y, x )[c] = saturate_cast<uchar>( frame.at<Vec3b>( y, x )[1] );
+                }
+            }
+        }
+        sprintf( filename, "./color/frame%04d.ppm", framesProcessed );
+        imwrite( filename, frame, compression_params );
+        sprintf( filename, "./PGM_out/frame%04d_out.pgm", framesProcessed );
+        split( new_image, frameBGR );
+        imwrite( filename, frameBGR[0], compression_params );
 
         imshow( currentFrame, frameBGR[0] );
         framesProcessed++;
 
-        winInput = waitKey( 2 );
+        winInput = waitKey( 1 );
         if( 27 == winInput )
         {
             break;
@@ -78,7 +80,6 @@ int main( int argc, char** argv )
     }
 
     capture.release();
-    video.release();
 
     destroyWindow( currentFrame );
 
