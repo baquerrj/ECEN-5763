@@ -50,6 +50,8 @@ int main( int argc, char** argv )
 
     namedWindow( currentFrame, WINDOW_GUI_NORMAL );
 
+    char filename[100];
+
     while( true )
     {
         capture.read( frame );
@@ -61,11 +63,12 @@ int main( int argc, char** argv )
 
         split( frame, frameBGR );
 
+        sprintf(filename, "./output/grayscale_frame_%04d.pgm", framesProcessed );
+        imwrite(filename, frameBGR[0]);
+        video.write( frameBGR[0] );
+
+        imshow( currentFrame, frameBGR[0] );
         framesProcessed++;
-
-        video.write( frameBGR[1] );
-
-        imshow( currentFrame, frameBGR[1] );
 
         winInput = waitKey( 2 );
         if( 27 == winInput )
