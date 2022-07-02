@@ -10,123 +10,179 @@
 using namespace cv;
 using namespace std;
 
+typedef struct {
+    double x_left;
+    double x_right;
+    double y_top;
+    double y_bottom;
+} edges_t;
+
 class Tracker
 {
 
 public:
     const String WINDOW_NAME = "Video Display";
-    static const int LINE_THICKNESS = 1;
-    static const int LINE_TYPE = 8;
-    static const int LINE_SHIFT = 0;
-
 public:
-    Tracker( const String filename )
+    Tracker( const String directory )
     {
-        myFilename = filename;
+        myDirectory = directory;
+        myEdges = { 0, 0, 0, 0 };
     }
-    ~Tracker();
+    ~Tracker() {}
 
-    void locateXleft( int i, int j );
-    void locateXright( int i, int j );
-    void locateYtop( int i, int j );
-    void locateYbottom( int i, int j );
-    void locateCom();
+    void loadNextImage();
+    void threshold();
+    void rasterImage();
+    void findCenter();
+    void drawCrosshairs();
+    void saveImage();
+    inline bool isImageEmpty()
+    {
+        return myImage.empty();
+    }
 
-public:
-    String myFilename;
-    int xleft;
-    int xright;
-    int xtop;
-    int xbottom;
-    int yleft;
-    int yright;
-    int ytop;
-    int ybottom;
+    inline Mat* getImage()
+    {
+        return &myImage;
+    }
 
-    int x;
-    int y;
+private:
+    String myDirectory;
+    Mat myImage;
+    double x_bar;
+    double y_bar;
+    int myFrameCounter;
+    edges_t myEdges;
 };
 
-void Tracker::locateXleft( int i, int j )
+void Tracker::threshold()
 {
-
-}
-void Tracker::locateXright( int i, int j )
-{
-
-}
-void Tracker::locateYtop( int i, int j )
-{
-
-}
-void Tracker::locateYbottom( int i, int j )
-{
-
-}
-void Tracker::locateCom()
-{
-
+    for( int y = 0; y < myImage.rows; y++ )
+    {
+        for( int x = 0; x < myImage.cols; x++ )
+        {
+            if( myImage.at<uchar>( y, x ) > 40 )
+            {
+                myImage.at<uchar>( y, x ) = 255;
+            }
+            else
+            {
+                myImage.at<uchar>( y, x ) = 0;
+            }
+        }
+    }
 }
 
+void Tracker::rasterImage()
+{
+    medianBlur( myImage, myImage, 3 );
+    bool foundFirstEdge = false;
+    for( int y = 0; y < myImage.rows; y++ )
+    {
+        for( int x = 0; x < myImage.cols; x++ )
+        {
+            if( not foundFirstEdge )
+            {
+                if( myImage.at<uchar>( y, x ) == 255 )
+                {
+                    if( ( myImage.at<uchar>( y - 1, x - 1 ) == 0 ) and
+                        ( myImage.at<uchar>( y - 1, x ) == 0 ) and
+                        ( myImage.at<uchar>( y, x - 1 ) == 0 ) )
+                    {
+                        foundFirstEdge = true;
+                        printf( "Found the first edge at (x,y) = (%d,%d)\n\r", x, y );
+                        myEdges.x_left = x;
+                        myEdges.y_top = y;
+                    }
+                }
+            }
+            else
+            {
+                if( myImage.at<uchar>( y, x ) == 0 )
+                {
+                    if( ( myImage.at<uchar>( y - 1, x - 1 ) == 255 ) and
+                        ( myImage.at<uchar>( y - 1, x ) == 255 ) and
+                        ( myImage.at<uchar>( y, x - 1 ) == 255 ) )
+                    {
+                        printf( "\nlast edge at x:%d y:%d", x, y );
+                        myEdges.x_right = x;
+                        myEdges.y_bottom = y;
+                        return;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Tracker::findCenter()
+{
+    x_bar = ( myEdges.x_right - myEdges.x_left ) / 2 + myEdges.x_left;
+    y_bar = ( myEdges.y_bottom - myEdges.y_top ) / 2 + myEdges.y_top;
+}
+
+void Tracker::drawCrosshairs()
+{
+    char text[50];
+    printf( "\nx_bar:%f y_bar:%f", x_bar, y_bar );
+    sprintf( text, "x_bar:%f y_bar:%f", x_bar, y_bar );
+    line( myImage, Point( myEdges.x_left - 30, y_bar ), Point( myEdges.x_right + 30, y_bar ), 255, 3, 8 );
+    line( myImage, Point( x_bar, myEdges.y_top - 30 ), Point( x_bar, myEdges.y_bottom + 30 ), 255, 3, 8 );
+    putText( myImage, text, Point( 30, 30 ), FONT_HERSHEY_COMPLEX_SMALL, 0.8, 255, 1, LINE_AA );
+    imshow( "image", myImage );
+}
+
+
+void Tracker::loadNextImage()
+{
+    char filename[100];
+    sprintf( filename, "frame%04d_out.pgm", myFrameCounter );
+    printf( "filename: %s\n\r", ( myDirectory + filename ).c_str() );
+    myImage = imread( ( myDirectory + filename ), IMREAD_GRAYSCALE );
+    myFrameCounter++;
+}
+
+void Tracker::saveImage()
+{
+    char filename[100];
+    sprintf( filename, "./output/frame%04d.pgm", myFrameCounter );
+    imwrite( filename, myImage );
+}
 
 int main( int argc, char** argv )
 {
 
     CommandLineParser parser( argc, argv,
-                              "{@input | ../Dark-Room-Laser-Spot-with-Clutter.mpeg | input video}" );
+                              "{@input | ../q5/PGM_out/ | input video}" );
 
-    VideoCapture capture( parser.get<String>( "@input") );
-
-    Size frameSize = Size( (int)capture.get( CAP_PROP_FRAME_WIDTH ), (int)capture.get( CAP_PROP_FRAME_HEIGHT ) );
-
-    VideoWriter video;
-    video.open( "processed.mp4", VideoWriter::fourcc( 'M', 'P', '4', 'V' ),
-                capture.get( CAP_PROP_FPS ), frameSize, true );
-
-    if( !video.isOpened() )
-    {
-        printf( "Could not open output video stream!\n\r" );
-        exit( -1 );
-    }
-
-    if( !capture.isOpened() )
-    {
-        printf( "Coult not open input video stream!\n\r" );
-        exit( -1 );
-    }
-
-    Mat frame;
-    capture.read( frame );
-    int framesProcessed = 0;
-
-    int numberOfChannels = frame.channels();
-    Mat frameBGR[numberOfChannels];
-
+    String directory = parser.get<String>( "@input" );
     char winInput;
 
     String currentFrame = "Current Frame";
 
-    namedWindow( currentFrame, WINDOW_GUI_NORMAL );
-
-    char filename[100];
+    Tracker tracker( directory );
+    Mat* image;
 
     while( true )
     {
-        capture.read( frame );
-
-        if( frame.empty() )
+        tracker.loadNextImage();
+        if( tracker.isImageEmpty() )
         {
             break;
         }
 
-        split( frame, frameBGR );
+        tracker.threshold();
 
-        sprintf(filename, "./output/grayscale_frame_%04d.pgm", framesProcessed );
-        imwrite(filename, frameBGR[0]);
-        video.write( frameBGR[0] );
+        tracker.rasterImage();
 
-        imshow( currentFrame, frameBGR[0] );
-        framesProcessed++;
+        tracker.findCenter();
+        tracker.drawCrosshairs();
+
+        tracker.saveImage();
+
+        image = tracker.getImage();
+
+        imshow( currentFrame, *image );
 
         winInput = waitKey( 2 );
         if( 27 == winInput )
@@ -134,11 +190,6 @@ int main( int argc, char** argv )
             break;
         }
     }
-
-    capture.release();
-    video.release();
-
-    destroyWindow( currentFrame );
 
     return 0;
 }
