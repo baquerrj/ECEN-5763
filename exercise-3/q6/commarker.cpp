@@ -19,14 +19,18 @@ typedef struct {
 
 class Tracker
 {
-
 public:
-    const String WINDOW_NAME = "Video Display";
+    static const String WINDOW_NAME;
 public:
     Tracker( const String directory )
     {
         myDirectory = directory;
         myEdges = { 0, 0, 0, 0 };
+        myFrameCounter = 0;
+        x_bar = 0.0;
+        y_bar = 0.0;
+        namedWindow( WINDOW_NAME, WINDOW_NORMAL );
+        resizeWindow( WINDOW_NAME, Size( 860, 480 ) );
     }
     ~Tracker() {}
 
@@ -54,6 +58,8 @@ private:
     int myFrameCounter;
     edges_t myEdges;
 };
+
+const String Tracker::WINDOW_NAME = "Video Display";
 
 void Tracker::threshold()
 {
@@ -129,7 +135,6 @@ void Tracker::drawCrosshairs()
     line( myImage, Point( myEdges.x_left - 30, y_bar ), Point( myEdges.x_right + 30, y_bar ), 255, 3, 8 );
     line( myImage, Point( x_bar, myEdges.y_top - 30 ), Point( x_bar, myEdges.y_bottom + 30 ), 255, 3, 8 );
     putText( myImage, text, Point( 30, 30 ), FONT_HERSHEY_COMPLEX_SMALL, 0.8, 255, 1, LINE_AA );
-    imshow( "image", myImage );
 }
 
 
@@ -158,8 +163,6 @@ int main( int argc, char** argv )
     String directory = parser.get<String>( "@input" );
     char winInput;
 
-    String currentFrame = "Current Frame";
-
     Tracker tracker( directory );
     Mat* image;
 
@@ -182,7 +185,7 @@ int main( int argc, char** argv )
 
         image = tracker.getImage();
 
-        imshow( currentFrame, *image );
+        imshow( Tracker::WINDOW_NAME, *image );
 
         winInput = waitKey( 2 );
         if( 27 == winInput )

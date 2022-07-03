@@ -1,6 +1,6 @@
 /**
  * @file grayscale.cpp
- * @brief This program performs background elimination and preserves the moving laser dot
+ * @brief This program converts the input video to grayscale images saved as PGMs
  */
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -32,7 +32,8 @@ int main( int argc, char** argv )
 
     String currentFrame = "Current Frame";
 
-    namedWindow( currentFrame, WINDOW_GUI_NORMAL );
+    namedWindow( currentFrame, WINDOW_NORMAL );
+    resizeWindow( currentFrame, Size( 860, 480 ) );
 
     char filename[100];
     vector<int> compression_params;
@@ -53,10 +54,10 @@ int main( int argc, char** argv )
         {
             for( int x = 0; x < frame.cols; x++ )
             {
-                for( int c = 0; c < 3; c++ )
-                {
-                    new_image.at<Vec3b>( y, x )[c] = saturate_cast<uchar>( frame.at<Vec3b>( y, x )[1] );
-                }
+
+                new_image.at<Vec3b>( y, x )[0] = 0;
+                new_image.at<Vec3b>( y, x )[1] = saturate_cast<uchar>( frame.at<Vec3b>( y, x )[1] );
+                new_image.at<Vec3b>( y, x )[2] = 0;
             }
         }
         sprintf( filename, "./output/frame%04d_out.pgm", framesProcessed );

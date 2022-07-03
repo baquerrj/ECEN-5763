@@ -20,6 +20,8 @@ $(shell mkdir -p $(BIN) &> /dev/null)
 BUILD = ./build
 $(shell mkdir -p $(BUILD) &> /dev/null)
 
+$(shell mkdir -p output/ &> /dev/null)
+
 .PRECIOUS : $(BUILD)/%.o
 
 all: $(BIN)/commarker
@@ -32,3 +34,4 @@ $(BIN)/%: $(BUILD)/%.o
 
 clean:
 	rm -rf $(BIN) $(BUILD)
+	rm -f output/*

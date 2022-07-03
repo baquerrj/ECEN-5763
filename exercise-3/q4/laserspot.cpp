@@ -23,7 +23,7 @@ int main( int argc, char** argv )
 
     Size frameSize = Size( (int)capture.get( CAP_PROP_FRAME_WIDTH ), (int)capture.get( CAP_PROP_FRAME_HEIGHT ) );
 
-    video.open( "processed.mp4", VideoWriter::fourcc( 'M', 'P', '4', 'V' ),
+    video.open( "q4_output.mp4", VideoWriter::fourcc( 'm', 'p', '4', 'v' ),
                 capture.get( CAP_PROP_FPS ), frameSize, true );
 
     if( !video.isOpened() )
@@ -51,12 +51,17 @@ int main( int argc, char** argv )
     String currentFrame = "Current Frame";
     String diffFrame = "Diff Frame";
 
-    namedWindow( previousFrame, WINDOW_GUI_NORMAL );
-    namedWindow( currentFrame, WINDOW_GUI_NORMAL );
-    namedWindow( diffFrame, WINDOW_GUI_NORMAL );
+    namedWindow( previousFrame, WINDOW_NORMAL );
+    namedWindow( currentFrame, WINDOW_NORMAL );
+    namedWindow( diffFrame, WINDOW_NORMAL );
+
+    resizeWindow( previousFrame, Size( 860, 480 ) );
+    resizeWindow( currentFrame, Size( 860, 480 ) );
+    resizeWindow( diffFrame, Size( 860, 480 ) );
 
     while( true )
     {
+        printf("Processing frame %d\n\r", framesProcessed );
         split( prev, prevBGR );
         capture.read( curr );
 
