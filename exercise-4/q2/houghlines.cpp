@@ -4,7 +4,6 @@
  */
 #include <stdio.h>
 #include <time.h>
-#include <iostream>
 
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -12,6 +11,22 @@
 
 using namespace cv;
 using namespace std;
+
+const char* sourceImage = "Source";
+const char* standardHough = "Detected Lines (in red) - Standard Hough Line Transform";
+const char* probabilisticHough = "Detected Lines (in red) - Probabilistic Line Transform";
+int min_threshold = 50;
+int max_trackbar = 150;
+
+int s_trackbar = max_trackbar;
+
+int hl_threshold = min_threshold + s_trackbar;
+
+void updateThreshold( int newValue, void* object )
+{
+    s_trackbar = newValue;
+    hl_threshold = min_threshold + s_trackbar;
+}
 
 double delta_t( struct timespec* stop, struct timespec* start )
 {
@@ -23,7 +38,6 @@ double delta_t( struct timespec* stop, struct timespec* start )
 }
 
 void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
-// Mat applyHoughlines( Mat * src, Mat * dst, Mat * cdst )
 {
     //![edge_detection]
        // Edge detection
@@ -37,7 +51,7 @@ void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
     //![hough_lines]
     // Standard Hough Line Transform
     vector<Vec2f> lines; // will hold the results of the detection
-    HoughLines( *dst, lines, 1, CV_PI / 180, 150, 0, 0 ); // runs the actual detection
+    HoughLines( *dst, lines, 1, CV_PI / 180, hl_threshold, 0, 0 ); // runs the actual detection
     //![hough_lines]
     //![draw_lines]
     // Draw the lines
@@ -82,9 +96,9 @@ int main( int argc, char** argv )
     bool help = parser.get<bool>( "help" );
     if( help )
     {
-        cout << "The sample uses Sobel or Scharr OpenCV functions for edge detection\n\n";
+        printf( "The sample uses Sobel or Scharr OpenCV functions for edge detection\n\n" );
         parser.printMessage();
-        cout << "\nPress 'ESC' to exit program.\nPress 'R' to reset values ( ksize will be -1 equal to Scharr function )";
+        printf("\nPress 'ESC' to exit program.\nPress 'R' to reset values ( ksize will be -1 equal to Scharr function )");
         return 0;
     }
 
@@ -124,6 +138,11 @@ int main( int argc, char** argv )
         }
     }
 
+    namedWindow( sourceImage );
+    namedWindow( standardHough );
+    namedWindow( probabilisticHough );
+
+    createTrackbar( "Standard HL Threshold:", standardHough, &s_trackbar, max_trackbar, updateThreshold, NULL );
 
     char winInput;
 
@@ -146,9 +165,9 @@ int main( int argc, char** argv )
 
         //![imshow]
         // Show results
-        imshow( "Source", src );
-        imshow( "Detected Lines (in red) - Standard Hough Line Transform", cdst );
-        imshow( "Detected Lines (in red) - Probabilistic Line Transform", cdstP );
+        imshow( sourceImage, src );
+        imshow( standardHough, cdst );
+        imshow( probabilisticHough, cdstP );
         //![imshow]
         if( ( winInput = waitKey( 10 ) ) == 27 )
         {
