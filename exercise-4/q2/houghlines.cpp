@@ -4,6 +4,7 @@
  */
 #include <stdio.h>
 #include <time.h>
+#include <iostream>
 
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -71,20 +72,58 @@ void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
     return;
 }
 
-int main(int argc, char** argv)
+int main( int argc, char** argv )
 {
+    CommandLineParser parser( argc, argv,
+                              "{camera        c|false|Use camera as source}"
+                              "{video         v|false|Use video file as source}"
+                              "{@videoInput    |../Dark-Room-Laser-Spot.mpeg|video source}"
+                              "{help    h|false|show help message}" );
+    bool help = parser.get<bool>( "help" );
+    if( help )
+    {
+        cout << "The sample uses Sobel or Scharr OpenCV functions for edge detection\n\n";
+        parser.printMessage();
+        cout << "\nPress 'ESC' to exit program.\nPress 'R' to reset values ( ksize will be -1 equal to Scharr function )";
+        return 0;
+    }
+
+    bool useCamera = parser.get<bool>( "camera" );
+    bool useVideo = parser.get<bool>( "video" );
+
+    String videoInput = parser.get<String>( "@videoInput" );
+
     // Declare the output variables
     Mat dst, cdst, cdstP;
 
-    VideoCapture cam0( 0 );
-
-    if( !cam0.isOpened() )
+    VideoCapture capture;
+    if( useCamera )
     {
-        exit(-1);
+        printf( "Using camera as source" );
+        if( not capture.open( 0 ) )
+        {
+            printf( "Could not open /dev/video0 as source!" );
+            return -1;
+        }
+        if( !capture.isOpened() )
+        {
+            printf( "Could not open /dev/video0 as source!" );
+            exit( -1 );
+        }
+
+        capture.set( CAP_PROP_FRAME_WIDTH, 640 );
+        capture.set( CAP_PROP_FRAME_HEIGHT, 480 );
+    }
+    else if( useVideo )
+    {
+        printf( "Using video as source" );
+        if( not capture.open( videoInput ) )
+        {
+            printf( "Could not open %s as source!\n\r", videoInput.c_str() );
+            return -1;
+        }
     }
 
-    cam0.set( CAP_PROP_FRAME_WIDTH, 640 );
-    cam0.set( CAP_PROP_FRAME_HEIGHT, 480 );
 
     char winInput;
 
@@ -98,18 +137,18 @@ int main(int argc, char** argv)
 
     while( true )
     {
-        cam0.read( src );
+        capture.read( src );
         clock_gettime( CLOCK_REALTIME, &start );
-        applyHoughlines( &src, &dst, &cdst , &cdstP );
+        applyHoughlines( &src, &dst, &cdst, &cdstP );
         clock_gettime( CLOCK_REALTIME, &stop );
         deltas += delta_t( &stop, &start );
         framesProcessed++;
 
         //![imshow]
         // Show results
-        imshow("Source", src);
-        imshow("Detected Lines (in red) - Standard Hough Line Transform", cdst);
-        imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP);
+        imshow( "Source", src );
+        imshow( "Detected Lines (in red) - Standard Hough Line Transform", cdst );
+        imshow( "Detected Lines (in red) - Probabilistic Line Transform", cdstP );
         //![imshow]
         if( ( winInput = waitKey( 10 ) ) == 27 )
         {
