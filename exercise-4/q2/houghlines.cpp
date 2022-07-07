@@ -4,6 +4,7 @@
  */
 #include <stdio.h>
 #include <time.h>
+#include <memory>
 
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -22,7 +23,7 @@ int s_trackbar = max_trackbar;
 
 int hl_threshold = min_threshold + s_trackbar;
 
-void updateThreshold( int newValue, void* object )
+void updateHoughThreshold( int newValue, void* object )
 {
     s_trackbar = newValue;
     hl_threshold = min_threshold + s_trackbar;
@@ -37,8 +38,168 @@ double delta_t( struct timespec* stop, struct timespec* start )
     return ( current - last );
 }
 
-void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
+class EdgeDetector
 {
+public:
+    EdgeDetector( int deviceId = 0, int frameWidth = 640, int frameHeight = 480 )
+    {
+        myCamera = VideoCapture( deviceId );
+        if( !myCamera.isOpened() )
+        {
+            printf( "Error opening camera %d\n\r", deviceId );
+            exit( -1 );
+        }
+        myCamera.set( CAP_PROP_FRAME_WIDTH, frameWidth );
+        myCamera.set( CAP_PROP_FRAME_HEIGHT, frameHeight );
+        printf("Opened camera\n\r" );
+
+        // myKsize = ksize;
+        // myScale = scale;
+        // myDelta = delta;
+
+        namedWindow( myWindowName );
+        printf( "Created window: %s\n\r", myWindowName.c_str() );
+
+        createTrackbars();
+        printf( "Created trackbars: %s\n\r", myWindowName.c_str() );
+
+    }
+    ~EdgeDetector() {}
+
+    inline void readCameraFrame()
+    {
+        printf("Reading camera frame\n\r");
+        myCamera.read( mySource );
+    }
+
+
+    inline void showImage()
+    {
+        imshow( myWindowName, myImageToShow );
+    }
+
+    inline void showImage( Mat * src )
+    {
+        imshow( myWindowName, *src );
+    }
+
+    inline void createTrackbars()
+    {
+        createTrackbar( "HL Threshold", myWindowName, &min_threshold, max_trackbar, updateHoughThreshold, this );
+        // createTrackbar( "Sobel Kernel Size:", myWindowName, &ksize, maxKsize, updateKsize, this );
+        // createTrackbar( "Sobel Scale:", myWindowName, &scale, 100, updateScale, this );
+        // createTrackbar( "Sobel Delta:", myWindowName, &delta, 100, updateDelta, this );
+    }
+
+    inline static void updateHoughThreshold( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setHoughThreshold( newValue );
+    }
+
+    inline static void updateKsize( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setKsize( newValue );
+    }
+
+    inline static void updateScale( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setScale( newValue );
+    }
+
+    inline static void updateDelta( int newValue, void* object )
+    {
+        EdgeDetector* ed = (EdgeDetector*)object;
+
+        ed->setDelta( newValue );
+    }
+
+    inline void setHoughThreshold( int value )
+    {
+        myThreshold = value;
+    }
+
+    inline void setKsize( int value )
+    {
+        if( value % 2 == 0 )
+        {
+            myKsize = value + 1;
+            setTrackbarPos( "Sobel Kernel Size:", myWindowName, myKsize );
+        }
+        else
+        {
+            myKsize = value;
+        }
+    }
+    inline void setScale( int value )
+    {
+        myScale = value;
+    }
+    inline void setDelta( int value )
+    {
+        myDelta = value;
+    }
+
+    inline void printAverageFrameRates()
+    {
+        double deltaT = deltasCanny / framesCanny;
+        deltaT = deltaT / 1000.0;
+        printf( "****************** CANNY * *****************\n\r" );
+        printf( "Processed %d frames in %3.4f seconds\n\r", framesCanny, deltasCanny / 1000.0 );
+        printf( "Canny Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
+        printf( "Canny Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
+    }
+    void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP  );
+
+    void applySobel();
+
+    inline int openImage( String name )
+    {
+        myWindowName = name;
+        mySource = imread( name, IMREAD_COLOR );
+        if( mySource.empty() )
+        {
+            printf( "Error opening image: %s\n", myWindowName.c_str() );
+            return 1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    inline Mat& getSource()
+    {
+        return mySource;
+    }
+
+private:
+    Mat mySource;
+    Mat myDestination;
+    Mat myImageToShow;
+    String myWindowName;
+    VideoCapture myCamera;
+    int myThreshold;
+    int myKsize;
+    int myScale;
+    int myDelta;
+
+    struct timespec start;
+    struct timespec stop;
+
+    double deltasCanny;
+
+    int framesCanny;
+};
+
+void EdgeDetector::applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
+{
+    printf("Applying HoughLines\n\r");
     //![edge_detection]
        // Edge detection
     Canny( *src, *dst, 50, 200, 3 );
@@ -51,7 +212,7 @@ void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
     //![hough_lines]
     // Standard Hough Line Transform
     vector<Vec2f> lines; // will hold the results of the detection
-    HoughLines( *dst, lines, 1, CV_PI / 180, hl_threshold, 0, 0 ); // runs the actual detection
+    HoughLines( *dst, lines, 1, CV_PI / 180, myThreshold, 0, 0 ); // runs the actual detection
     //![hough_lines]
     //![draw_lines]
     // Draw the lines
@@ -110,39 +271,17 @@ int main( int argc, char** argv )
     // Declare the output variables
     Mat dst, cdst, cdstP;
 
-    VideoCapture capture;
-    if( useCamera )
-    {
-        printf( "Using camera as source" );
-        if( not capture.open( 0 ) )
-        {
-            printf( "Could not open /dev/video0 as source!" );
-            return -1;
-        }
-        if( !capture.isOpened() )
-        {
-            printf( "Could not open /dev/video0 as source!" );
-            exit( -1 );
-        }
 
-        capture.set( CAP_PROP_FRAME_WIDTH, 640 );
-        capture.set( CAP_PROP_FRAME_HEIGHT, 480 );
-    }
-    else if( useVideo )
+    EdgeDetector* edgeDetector = new EdgeDetector();
+
+    if( edgeDetector == NULL )
     {
-        printf( "Using video as source" );
-        if( not capture.open( videoInput ) )
-        {
-            printf( "Could not open %s as source!\n\r", videoInput.c_str() );
-            return -1;
-        }
+        return -1;
     }
 
-    namedWindow( sourceImage );
-    namedWindow( standardHough );
-    namedWindow( probabilisticHough );
-
-    createTrackbar( "Standard HL Threshold:", standardHough, &s_trackbar, max_trackbar, updateThreshold, NULL );
+    // namedWindow( sourceImage );
+    // namedWindow( standardHough );
+    // namedWindow( probabilisticHough );
 
     char winInput;
 
@@ -156,18 +295,24 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        capture.read( src );
+        edgeDetector->readCameraFrame();
+        src = edgeDetector->getSource();
+        if( src.empty() )
+        {
+            printf(" image is empty!\n\r" );
+            continue;
+        }
         clock_gettime( CLOCK_REALTIME, &start );
-        applyHoughlines( &src, &dst, &cdst, &cdstP );
+        edgeDetector->applyHoughlines( &src, &dst, &cdst, &cdstP );
         clock_gettime( CLOCK_REALTIME, &stop );
         deltas += delta_t( &stop, &start );
         framesProcessed++;
 
         //![imshow]
         // Show results
-        imshow( sourceImage, src );
-        imshow( standardHough, cdst );
-        imshow( probabilisticHough, cdstP );
+        edgeDetector->showImage( &src );
+        // imshow( standardHough, cdst );
+        // imshow( probabilisticHough, cdstP );
         //![imshow]
         if( ( winInput = waitKey( 10 ) ) == 27 )
         {
@@ -179,6 +324,11 @@ int main( int argc, char** argv )
     double deltaT = deltaTMS / 1000.0;
     printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
     printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
+    if( edgeDetector != NULL )
+    {
+        delete edgeDetector;
+    }
 
     return 0;
 }
