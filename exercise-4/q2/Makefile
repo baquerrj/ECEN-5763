@@ -9,7 +9,7 @@ LIBS =
 
 CPP = g++
 CFLAGS = -Wall -c -I.
-CPPFLAGS = -Wall $(CPPINCLUDE_DIRS)
+CPPFLAGS = -Wall -Wextra -Wshadow -Wundef -fno-common $(CPPINCLUDE_DIRS)
 LFLAGS = -Wall
 
 CPPSOURCE = houghlines.cpp

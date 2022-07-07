@@ -13,206 +13,204 @@
 using namespace cv;
 using namespace std;
 
-const char* sourceImage = "Source";
-const char* standardHough = "Detected Lines (in red) - Standard Hough Line Transform";
-const char* probabilisticHough = "Detected Lines (in red) - Probabilistic Line Transform";
-int min_threshold = 50;
-int max_trackbar = 150;
-
-int s_trackbar = max_trackbar;
-
-int hl_threshold = min_threshold + s_trackbar;
-
-void updateHoughThreshold( int newValue, void* object )
-{
-    s_trackbar = newValue;
-    hl_threshold = min_threshold + s_trackbar;
-}
-
-double delta_t( struct timespec* stop, struct timespec* start )
-{
-    double current = ( (double)stop->tv_sec * 1000.0 ) +
-        ( (double)( (double)stop->tv_nsec / 1000000.0 ) );
-    double last = ( (double)start->tv_sec * 1000.0 ) +
-        ( (double)( (double)start->tv_nsec / 1000000.0 ) );
-    return ( current - last );
-}
+static const int min_threshold = 50;
+static const int max_trackbar = 150;
+static const int min_linelength = 50;
+static const int min_maxlinegap = 50;
 
 class EdgeDetector
 {
-public:
-    EdgeDetector( int deviceId = 0, int frameWidth = 640, int frameHeight = 480 )
+    public:
+    static const String SOURCE_WINDOW_NAME;
+    static const String STANDARD_WINDOW_NAME;
+    static const String PROBABILISTIC_WINDOW_NAME;
+
+    static const int INITIAL_STANDARD_HOUGH_THRESHOLD = 150;
+    static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 50;
+    static const int INITIAL_MIN_LINE_LENGTH = 50;
+    static const int INITIAL_MAX_LINE_LAP = 1;
+
+    static const int MAX_STANDARD_HOUGH_THRESHOLD = 200;
+    static const int MAX_PROBABILISTIC_HOUGH_THRESHOLD = 150;
+    static const int MAX_MIN_LINE_LENGTH = 100;
+    static const int MAX_MAX_LINE_LAP = 25;
+
+    public:
+    EdgeDetector( bool useCamera = true,
+                  int deviceId = 0,
+                  int frameWidth = 640,
+                  int frameHeight = 480,
+                  const String videoInput = "" )
     {
-        myCamera = VideoCapture( deviceId );
-        if( !myCamera.isOpened() )
+        if( useCamera )
         {
-            printf( "Error opening camera %d\n\r", deviceId );
-            exit( -1 );
+            myCamera = VideoCapture( deviceId );
+            if( !myCamera.isOpened() )
+            {
+                printf( "Error opening camera %d\n\r", deviceId );
+                exit( -1 );
+            }
+            myCamera.set( CAP_PROP_FRAME_WIDTH, frameWidth );
+            myCamera.set( CAP_PROP_FRAME_HEIGHT, frameHeight );
+            printf( "Opened camera\n\r" );
         }
-        myCamera.set( CAP_PROP_FRAME_WIDTH, frameWidth );
-        myCamera.set( CAP_PROP_FRAME_HEIGHT, frameHeight );
-        printf("Opened camera\n\r" );
+        else
+        {
+            myCamera = VideoCapture( videoInput );
+        }
+        myHoughLinesThreshold = INITIAL_STANDARD_HOUGH_THRESHOLD;
+        myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
+        myMaxLineGap = INITIAL_MAX_LINE_LAP;
+        myMinLineLength = INITIAL_MIN_LINE_LENGTH;
 
-        // myKsize = ksize;
-        // myScale = scale;
-        // myDelta = delta;
+        namedWindow( SOURCE_WINDOW_NAME, WINDOW_NORMAL );
+        resizeWindow( SOURCE_WINDOW_NAME, Size( frameWidth, frameHeight ) );
+        printf( "Created window: %s\n\r", SOURCE_WINDOW_NAME.c_str() );
 
-        namedWindow( myWindowName );
-        printf( "Created window: %s\n\r", myWindowName.c_str() );
+        namedWindow( STANDARD_WINDOW_NAME, WINDOW_NORMAL );
+        resizeWindow( STANDARD_WINDOW_NAME, Size( frameWidth, frameHeight ) );
+        printf( "Created window: %s\n\r", STANDARD_WINDOW_NAME.c_str() );
+
+        namedWindow( PROBABILISTIC_WINDOW_NAME, WINDOW_NORMAL );
+        resizeWindow( PROBABILISTIC_WINDOW_NAME, Size( frameWidth, frameHeight ) );
+        printf( "Created window: %s\n\r", PROBABILISTIC_WINDOW_NAME.c_str() );
 
         createTrackbars();
-        printf( "Created trackbars: %s\n\r", myWindowName.c_str() );
+        printf( "Created trackbars for (%s) and (%s)\n\r", STANDARD_WINDOW_NAME.c_str(), PROBABILISTIC_WINDOW_NAME.c_str() );
 
     }
-    ~EdgeDetector() {}
+    ~EdgeDetector()
+    {
+        destroyAllWindows();
+    }
 
     inline void readCameraFrame()
     {
-        printf("Reading camera frame\n\r");
         myCamera.read( mySource );
     }
 
 
-    inline void showImage()
+    inline void showSourceImage()
     {
-        imshow( myWindowName, myImageToShow );
+        imshow( SOURCE_WINDOW_NAME, mySource );
     }
 
-    inline void showImage( Mat * src )
+    inline void showStandardTransform()
     {
-        imshow( myWindowName, *src );
+        imshow( STANDARD_WINDOW_NAME, myStandardHoughTransform );
+    }
+
+    inline void showProbabilisticTransform()
+    {
+        imshow( PROBABILISTIC_WINDOW_NAME, myProbabilisticHoughTransform );
     }
 
     inline void createTrackbars()
     {
-        createTrackbar( "HL Threshold", myWindowName, &min_threshold, max_trackbar, updateHoughThreshold, this );
-        // createTrackbar( "Sobel Kernel Size:", myWindowName, &ksize, maxKsize, updateKsize, this );
-        // createTrackbar( "Sobel Scale:", myWindowName, &scale, 100, updateScale, this );
-        // createTrackbar( "Sobel Delta:", myWindowName, &delta, 100, updateDelta, this );
+        createTrackbar( "HL Threshold", STANDARD_WINDOW_NAME,
+                        &myHoughLinesThreshold,
+                        MAX_STANDARD_HOUGH_THRESHOLD,
+                        updateHoughThreshold,
+                        this );
+        createTrackbar( "HL P Threshold:",
+                        PROBABILISTIC_WINDOW_NAME,
+                        &myHoughLinesPThreshold,
+                        MAX_PROBABILISTIC_HOUGH_THRESHOLD,
+                        updateHoughLinesPThreshold,
+                        this );
+        createTrackbar( "HL P Min Line Length:",
+                        PROBABILISTIC_WINDOW_NAME,
+                        &myMinLineLength,
+                        MAX_MIN_LINE_LENGTH,
+                        updateMinLineLength,
+                        this );
+        createTrackbar( "HL P Max Line Gap:",
+                        PROBABILISTIC_WINDOW_NAME,
+                        &myMaxLineGap,
+                        MAX_MAX_LINE_LAP,
+                        updateMaxLineGap,
+                        this );
     }
 
     inline static void updateHoughThreshold( int newValue, void* object )
     {
         EdgeDetector* ed = (EdgeDetector*)object;
 
-        ed->setHoughThreshold( newValue );
+        ed->setHoughLinesThreshold( newValue );
     }
 
-    inline static void updateKsize( int newValue, void* object )
+    inline static void updateHoughLinesPThreshold( int newValue, void* object )
     {
         EdgeDetector* ed = (EdgeDetector*)object;
 
-        ed->setKsize( newValue );
+        ed->setHoughLinesPThreshold( newValue );
     }
 
-    inline static void updateScale( int newValue, void* object )
+    inline static void updateMinLineLength( int newValue, void* object )
     {
         EdgeDetector* ed = (EdgeDetector*)object;
 
-        ed->setScale( newValue );
+        ed->setMinLineLength( newValue );
     }
 
-    inline static void updateDelta( int newValue, void* object )
+    inline static void updateMaxLineGap( int newValue, void* object )
     {
         EdgeDetector* ed = (EdgeDetector*)object;
 
-        ed->setDelta( newValue );
+        ed->setMaxLineGap( newValue );
     }
 
-    inline void setHoughThreshold( int value )
+    inline void setHoughLinesThreshold( int value )
     {
-        myThreshold = value;
+        myHoughLinesThreshold = value;
     }
 
-    inline void setKsize( int value )
+    inline void setHoughLinesPThreshold( int value )
     {
-        if( value % 2 == 0 )
-        {
-            myKsize = value + 1;
-            setTrackbarPos( "Sobel Kernel Size:", myWindowName, myKsize );
-        }
-        else
-        {
-            myKsize = value;
-        }
+        myHoughLinesPThreshold = value;
     }
-    inline void setScale( int value )
+    inline void setMinLineLength( int value )
     {
-        myScale = value;
+        myMinLineLength = value;
     }
-    inline void setDelta( int value )
+    inline void setMaxLineGap( int value )
     {
-        myDelta = value;
+        myMaxLineGap = value;
     }
 
-    inline void printAverageFrameRates()
-    {
-        double deltaT = deltasCanny / framesCanny;
-        deltaT = deltaT / 1000.0;
-        printf( "****************** CANNY * *****************\n\r" );
-        printf( "Processed %d frames in %3.4f seconds\n\r", framesCanny, deltasCanny / 1000.0 );
-        printf( "Canny Average Frame Rate: %3.4f sec/frame\n\r", deltaT );
-        printf( "Canny Average Frame Rate: %3.4f frames/sec (fps)\n\r", 1.0 / deltaT );
-    }
-    void applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP  );
+    void applyHoughlines();
 
-    void applySobel();
-
-    inline int openImage( String name )
-    {
-        myWindowName = name;
-        mySource = imread( name, IMREAD_COLOR );
-        if( mySource.empty() )
-        {
-            printf( "Error opening image: %s\n", myWindowName.c_str() );
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-    }
-
-    inline Mat& getSource()
-    {
-        return mySource;
-    }
-
-private:
+    private:
     Mat mySource;
-    Mat myDestination;
-    Mat myImageToShow;
-    String myWindowName;
     VideoCapture myCamera;
-    int myThreshold;
-    int myKsize;
-    int myScale;
-    int myDelta;
+    int myHoughLinesThreshold;
+    int myHoughLinesPThreshold;
+    int myMinLineLength;
+    int myMaxLineGap;
 
-    struct timespec start;
-    struct timespec stop;
-
-    double deltasCanny;
-
-    int framesCanny;
+    Mat tmp;
+    Mat myStandardHoughTransform;
+    Mat myProbabilisticHoughTransform;
 };
 
-void EdgeDetector::applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
+const String EdgeDetector::SOURCE_WINDOW_NAME = "Source";
+const String EdgeDetector::STANDARD_WINDOW_NAME = "Detected Lines (in red) - Standard Hough Line Transform";
+const String EdgeDetector::PROBABILISTIC_WINDOW_NAME = "Detected Lines (in red) - Probabilistic Line Transform";
+
+void EdgeDetector::applyHoughlines()
 {
-    printf("Applying HoughLines\n\r");
-    //![edge_detection]
-       // Edge detection
-    Canny( *src, *dst, 50, 200, 3 );
+    // Edge detection
+    Canny( mySource, tmp, 50, 200, 3 );
     //![edge_detection]
 
     // Copy edges to the images that will display the results in BGR
-    cvtColor( *dst, *cdst, COLOR_GRAY2BGR );
-    *cdstP = cdst->clone();
+    cvtColor( tmp, myStandardHoughTransform, COLOR_GRAY2BGR );
+    myProbabilisticHoughTransform = myStandardHoughTransform.clone();
 
     //![hough_lines]
     // Standard Hough Line Transform
     vector<Vec2f> lines; // will hold the results of the detection
-    HoughLines( *dst, lines, 1, CV_PI / 180, myThreshold, 0, 0 ); // runs the actual detection
+    HoughLines( tmp, lines, 1, CV_PI / 180, myHoughLinesThreshold, 150, 0 ); // runs the actual detection
     //![hough_lines]
     //![draw_lines]
     // Draw the lines
@@ -226,21 +224,22 @@ void EdgeDetector::applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
         pt1.y = cvRound( y0 + 1000 * ( a ) );
         pt2.x = cvRound( x0 - 1000 * ( -b ) );
         pt2.y = cvRound( y0 - 1000 * ( a ) );
-        line( *cdst, pt1, pt2, Scalar( 0, 0, 255 ), 3, LINE_AA );
+        line( myStandardHoughTransform, pt1, pt2, Scalar( 0, 0, 255 ), 3, LINE_AA );
     }
     //![draw_lines]
 
     //![hough_lines_p]
     // Probabilistic Line Transform
     vector<Vec4i> linesP; // will hold the results of the detection
-    HoughLinesP( *dst, linesP, 1, CV_PI / 180, 50, 50, 10 ); // runs the actual detection
+    printf( "HLP with %d, %d, %d\n\r", myHoughLinesPThreshold, myMinLineLength, myMaxLineGap );
+    HoughLinesP( tmp, linesP, 1, CV_PI / 180, myHoughLinesPThreshold, myMinLineLength, myMaxLineGap ); // runs the actual detection
     //![hough_lines_p]
     //![draw_lines_p]
     // Draw the lines
     for( size_t i = 0; i < linesP.size(); i++ )
     {
         Vec4i l = linesP[i];
-        line( *cdstP, Point( l[0], l[1] ), Point( l[2], l[3] ), Scalar( 0, 0, 255 ), 3, LINE_AA );
+        line( myProbabilisticHoughTransform, Point( l[0], l[1] ), Point( l[2], l[3] ), Scalar( 0, 0, 255 ), 3, LINE_AA );
     }
     //![draw_lines_p]
 
@@ -250,80 +249,50 @@ void EdgeDetector::applyHoughlines( Mat* src, Mat* dst, Mat* cdst, Mat* cdstP )
 int main( int argc, char** argv )
 {
     CommandLineParser parser( argc, argv,
-                              "{camera        c|false|Use camera as source}"
-                              "{video         v|false|Use video file as source}"
-                              "{@videoInput    |../Dark-Room-Laser-Spot.mpeg|video source}"
+                              "{camera        c|false|Use camera as source. If omitted, path to file must be supplied.}"
+                              "{video         v|./NIR-front-facing/GP010639.MP4|video source}"
                               "{help    h|false|show help message}" );
     bool help = parser.get<bool>( "help" );
     if( help )
     {
-        printf( "The sample uses Sobel or Scharr OpenCV functions for edge detection\n\n" );
+        printf( "The program uses the standard and probabilistic Hough algorithms to detect lines\n" );
         parser.printMessage();
-        printf("\nPress 'ESC' to exit program.\nPress 'R' to reset values ( ksize will be -1 equal to Scharr function )");
+        printf( "Press the ESC key to exit the program.\n" );
         return 0;
     }
 
     bool useCamera = parser.get<bool>( "camera" );
-    bool useVideo = parser.get<bool>( "video" );
 
-    String videoInput = parser.get<String>( "@videoInput" );
+    String videoInput = parser.get<String>( "video" );
 
-    // Declare the output variables
-    Mat dst, cdst, cdstP;
-
-
-    EdgeDetector* edgeDetector = new EdgeDetector();
+    EdgeDetector* edgeDetector = new EdgeDetector( useCamera, 0, 640, 480, videoInput );
 
     if( edgeDetector == NULL )
     {
         return -1;
     }
 
-    // namedWindow( sourceImage );
-    // namedWindow( standardHough );
-    // namedWindow( probabilisticHough );
-
     char winInput;
-
-    Mat src;
-    // used to calculate fps in while-loop
-    struct timespec start = { 0, 0 };
-    struct timespec stop = { 0, 0 };
-    double deltas = 0.0;
 
     int framesProcessed = 0;
 
     while( true )
     {
         edgeDetector->readCameraFrame();
-        src = edgeDetector->getSource();
-        if( src.empty() )
-        {
-            printf(" image is empty!\n\r" );
-            continue;
-        }
-        clock_gettime( CLOCK_REALTIME, &start );
-        edgeDetector->applyHoughlines( &src, &dst, &cdst, &cdstP );
-        clock_gettime( CLOCK_REALTIME, &stop );
-        deltas += delta_t( &stop, &start );
+        edgeDetector->applyHoughlines();
         framesProcessed++;
 
         //![imshow]
         // Show results
-        edgeDetector->showImage( &src );
-        // imshow( standardHough, cdst );
-        // imshow( probabilisticHough, cdstP );
+        edgeDetector->showStandardTransform();
+        edgeDetector->showProbabilisticTransform();
+        edgeDetector->showSourceImage();
         //![imshow]
-        if( ( winInput = waitKey( 10 ) ) == 27 )
+        if( ( winInput = waitKey( 2 ) ) == 27 )
         {
             break;
         }
     }
-
-    double deltaTMS = deltas / framesProcessed;
-    double deltaT = deltaTMS / 1000.0;
-    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
-    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
 
     if( edgeDetector != NULL )
     {
