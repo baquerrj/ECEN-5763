@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 2.8)
+project( skeletal )
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+
+add_executable( skeletal skeletal.cpp )
+add_executable( captureskel captureskel.cpp )
+target_link_libraries( skeletal ${OpenCV_LIBS} )
+target_link_libraries( captureskel ${OpenCV_LIBS} )
