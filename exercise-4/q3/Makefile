@@ -123,46 +123,6 @@ skeletal/fast:
 	$(MAKE) -f CMakeFiles/skeletal.dir/build.make CMakeFiles/skeletal.dir/build
 .PHONY : skeletal/fast
 
-#=============================================================================
-# Target rules for targets named captureskel
-
-# Build rule for target.
-captureskel: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 captureskel
-.PHONY : captureskel
-
-# fast build rule for target.
-captureskel/fast:
-	$(MAKE) -f CMakeFiles/captureskel.dir/build.make CMakeFiles/captureskel.dir/build
-.PHONY : captureskel/fast
-
-captureskel.o: captureskel.cpp.o
-
-.PHONY : captureskel.o
-
-# target to build an object file
-captureskel.cpp.o:
-	$(MAKE) -f CMakeFiles/captureskel.dir/build.make CMakeFiles/captureskel.dir/captureskel.cpp.o
-.PHONY : captureskel.cpp.o
-
-captureskel.i: captureskel.cpp.i
-
-.PHONY : captureskel.i
-
-# target to preprocess a source file
-captureskel.cpp.i:
-	$(MAKE) -f CMakeFiles/captureskel.dir/build.make CMakeFiles/captureskel.dir/captureskel.cpp.i
-.PHONY : captureskel.cpp.i
-
-captureskel.s: captureskel.cpp.s
-
-.PHONY : captureskel.s
-
-# target to generate assembly for a file
-captureskel.cpp.s:
-	$(MAKE) -f CMakeFiles/captureskel.dir/build.make CMakeFiles/captureskel.dir/captureskel.cpp.s
-.PHONY : captureskel.cpp.s
-
 skeletal.o: skeletal.cpp.o
 
 .PHONY : skeletal.o
@@ -199,10 +159,6 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... skeletal"
 	@echo "... edit_cache"
-	@echo "... captureskel"
-	@echo "... captureskel.o"
-	@echo "... captureskel.i"
-	@echo "... captureskel.s"
 	@echo "... skeletal.o"
 	@echo "... skeletal.i"
 	@echo "... skeletal.s"
