@@ -27,7 +27,7 @@ int main( int argc, char** argv )
             " * [ESC] -> Close program \n" << endl;
 
     //![load]
-    const char* filename = argc >=2 ? argv[1] : "../data/chicky_512.png";
+    const char* filename = argc >=2 ? argv[1] : "./chicky_512.png";
 
     // Loads an image
     Mat src = imread( filename );
