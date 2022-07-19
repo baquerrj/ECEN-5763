@@ -60,10 +60,14 @@ Mat applySkeletal( Mat* src )
 int main()
 {
     VideoCapture camera( 0 );
+    camera.set( CAP_PROP_FRAME_WIDTH, 640 );
+    camera.set( CAP_PROP_FRAME_HEIGHT, 480 );
     Mat src;
 
     int framesProcessed = 0;
     char winInput;
+
+    char filename[100];
 
     while( framesProcessed < 3000 )
     {
@@ -72,7 +76,7 @@ int main()
         if( src.empty() )
         {
             cout << "could not read from camera" << endl;
-            continue;;
+            continue;
         }
 
         // show original source image and wait for input to next step
@@ -80,14 +84,21 @@ int main()
         Mat skel = applySkeletal( &src );
 
         imshow( "skeleton", skel );
-
-        winInput = waitKey( 10 );
+        sprintf( filename, "frame%04d.jpg", framesProcessed );
+        imwrite( filename, skel );
+        winInput = waitKey( 1 );
         if( 'q' == winInput )
         {
             break;
         }
         framesProcessed++;
+        if( (framesProcessed % 10) == 0 )
+        {
+            printf("Processed %d frames\n\r", framesProcessed );
+        }
     }
+
+    camera.release();
 
     return 0;
 }

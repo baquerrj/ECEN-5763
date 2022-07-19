@@ -19,12 +19,8 @@ class Detector
 public:
     Detector() : m(Default), hog(), hog_d(Size(48, 96), Size(16, 16), Size(8, 8), Size(8, 8), 9)
     {
-        // vector<float> descriptorVector;
-        // vector<unsigned int> descriptorVectorIndices;
-        const string myDetector = "../q6/my_detector.yml";
-        HOGDescriptor descriptor = HOGDescriptor(myDetector);
         hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
-        hog_d.setSVMDetector(descriptor.svmDetector);
+        hog_d.setSVMDetector( HOGDescriptor::getDaimlerPeopleDetector() );
     }
     void toggleMode() { m = (m == Default ? Daimler : Default); }
     string modeName() const { return (m == Default ? "Default" : "Daimler"); }
