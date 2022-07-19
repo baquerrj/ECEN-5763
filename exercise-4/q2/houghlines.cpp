@@ -259,7 +259,7 @@ int main( int argc, char** argv )
 {
     CommandLineParser parser( argc, argv,
                               "{camera          c|false|Use camera as source. If omitted, path to file must be supplied.}"
-                              "{video           v|./NIR-front-facing/GP010639.MP4|video source}"
+                              "{video           v|./videos/GP010639.MP4|video source}"
                               "{useTrackbars    t|false|Use trackbars}"
                               "{help            h|false|show help message}" );
     bool help = parser.get<bool>( "help" );
