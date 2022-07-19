@@ -18,29 +18,30 @@ static const int max_trackbar = 150;
 static const int min_linelength = 50;
 static const int min_maxlinegap = 50;
 
-class EdgeDetector
+class LineDetector
 {
     public:
     static const String SOURCE_WINDOW_NAME;
     static const String STANDARD_WINDOW_NAME;
     static const String PROBABILISTIC_WINDOW_NAME;
 
-    static const int INITIAL_STANDARD_HOUGH_THRESHOLD = 150;
-    static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 50;
-    static const int INITIAL_MIN_LINE_LENGTH = 50;
+    static const int INITIAL_STANDARD_HOUGH_THRESHOLD = 165;
+    static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 20;
+    static const int INITIAL_MIN_LINE_LENGTH = 10;
     static const int INITIAL_MAX_LINE_LAP = 1;
 
-    static const int MAX_STANDARD_HOUGH_THRESHOLD = 200;
+    static const int MAX_STANDARD_HOUGH_THRESHOLD = 300;
     static const int MAX_PROBABILISTIC_HOUGH_THRESHOLD = 150;
     static const int MAX_MIN_LINE_LENGTH = 100;
     static const int MAX_MAX_LINE_LAP = 25;
 
     public:
-    EdgeDetector( bool useCamera = true,
+    LineDetector( bool useCamera = true,
                   int deviceId = 0,
                   int frameWidth = 640,
                   int frameHeight = 480,
-                  const String videoInput = "" )
+                  const String videoInput = "",
+                  const bool useTrackbars = true )
     {
         if( useCamera )
         {
@@ -75,11 +76,14 @@ class EdgeDetector
         resizeWindow( PROBABILISTIC_WINDOW_NAME, Size( frameWidth, frameHeight ) );
         printf( "Created window: %s\n\r", PROBABILISTIC_WINDOW_NAME.c_str() );
 
-        createTrackbars();
-        printf( "Created trackbars for (%s) and (%s)\n\r", STANDARD_WINDOW_NAME.c_str(), PROBABILISTIC_WINDOW_NAME.c_str() );
+        if( useTrackbars )
+        {
+            createTrackbars();
+            printf( "Created trackbars for (%s) and (%s)\n\r", STANDARD_WINDOW_NAME.c_str(), PROBABILISTIC_WINDOW_NAME.c_str() );
+        }
 
     }
-    ~EdgeDetector()
+    ~LineDetector()
     {
         destroyAllWindows();
     }
@@ -87,6 +91,11 @@ class EdgeDetector
     inline void readCameraFrame()
     {
         myCamera.read( mySource );
+    }
+
+    inline bool isFrameEmpty()
+    {
+        return mySource.empty();
     }
 
 
@@ -134,28 +143,28 @@ class EdgeDetector
 
     inline static void updateHoughThreshold( int newValue, void* object )
     {
-        EdgeDetector* ed = (EdgeDetector*)object;
+        LineDetector* ed = (LineDetector*)object;
 
         ed->setHoughLinesThreshold( newValue );
     }
 
     inline static void updateHoughLinesPThreshold( int newValue, void* object )
     {
-        EdgeDetector* ed = (EdgeDetector*)object;
+        LineDetector* ed = (LineDetector*)object;
 
         ed->setHoughLinesPThreshold( newValue );
     }
 
     inline static void updateMinLineLength( int newValue, void* object )
     {
-        EdgeDetector* ed = (EdgeDetector*)object;
+        LineDetector* ed = (LineDetector*)object;
 
         ed->setMinLineLength( newValue );
     }
 
     inline static void updateMaxLineGap( int newValue, void* object )
     {
-        EdgeDetector* ed = (EdgeDetector*)object;
+        LineDetector* ed = (LineDetector*)object;
 
         ed->setMaxLineGap( newValue );
     }
@@ -193,11 +202,11 @@ class EdgeDetector
     Mat myProbabilisticHoughTransform;
 };
 
-const String EdgeDetector::SOURCE_WINDOW_NAME = "Source";
-const String EdgeDetector::STANDARD_WINDOW_NAME = "Detected Lines (in red) - Standard Hough Line Transform";
-const String EdgeDetector::PROBABILISTIC_WINDOW_NAME = "Detected Lines (in red) - Probabilistic Line Transform";
+const String LineDetector::SOURCE_WINDOW_NAME = "Source";
+const String LineDetector::STANDARD_WINDOW_NAME = "Detected Lines (in red) - Standard Hough Line Transform";
+const String LineDetector::PROBABILISTIC_WINDOW_NAME = "Detected Lines (in red) - Probabilistic Line Transform";
 
-void EdgeDetector::applyHoughlines()
+void LineDetector::applyHoughlines()
 {
     // Edge detection
     Canny( mySource, tmp, 50, 200, 3 );
@@ -210,7 +219,7 @@ void EdgeDetector::applyHoughlines()
     //![hough_lines]
     // Standard Hough Line Transform
     vector<Vec2f> lines; // will hold the results of the detection
-    HoughLines( tmp, lines, 1, CV_PI / 180, myHoughLinesThreshold, 150, 0 ); // runs the actual detection
+    HoughLines( tmp, lines, 1, CV_PI / 180, myHoughLinesThreshold, 0, 0 ); // runs the actual detection
     //![hough_lines]
     //![draw_lines]
     // Draw the lines
@@ -249,9 +258,10 @@ void EdgeDetector::applyHoughlines()
 int main( int argc, char** argv )
 {
     CommandLineParser parser( argc, argv,
-                              "{camera        c|false|Use camera as source. If omitted, path to file must be supplied.}"
-                              "{video         v|./NIR-front-facing/GP010639.MP4|video source}"
-                              "{help    h|false|show help message}" );
+                              "{camera          c|false|Use camera as source. If omitted, path to file must be supplied.}"
+                              "{video           v|./NIR-front-facing/GP010639.MP4|video source}"
+                              "{useTrackbars    t|false|Use trackbars}"
+                              "{help            h|false|show help message}" );
     bool help = parser.get<bool>( "help" );
     if( help )
     {
@@ -262,12 +272,13 @@ int main( int argc, char** argv )
     }
 
     bool useCamera = parser.get<bool>( "camera" );
+    bool useTrackbars = parser.get<bool>( "useTrackbars" );
 
     String videoInput = parser.get<String>( "video" );
 
-    EdgeDetector* edgeDetector = new EdgeDetector( useCamera, 0, 640, 480, videoInput );
+    LineDetector* detector = new LineDetector( useCamera, 0, 640, 480, videoInput, useTrackbars );
 
-    if( edgeDetector == NULL )
+    if( detector == NULL )
     {
         return -1;
     }
@@ -278,15 +289,19 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        edgeDetector->readCameraFrame();
-        edgeDetector->applyHoughlines();
+        detector->readCameraFrame();
+        if( detector->isFrameEmpty() )
+        {
+            break;
+        }
+        detector->applyHoughlines();
         framesProcessed++;
 
         //![imshow]
         // Show results
-        edgeDetector->showStandardTransform();
-        edgeDetector->showProbabilisticTransform();
-        edgeDetector->showSourceImage();
+        detector->showStandardTransform();
+        detector->showProbabilisticTransform();
+        detector->showSourceImage();
         //![imshow]
         if( ( winInput = waitKey( 2 ) ) == 27 )
         {
@@ -294,9 +309,9 @@ int main( int argc, char** argv )
         }
     }
 
-    if( edgeDetector != NULL )
+    if( detector != NULL )
     {
-        delete edgeDetector;
+        delete detector;
     }
 
     return 0;

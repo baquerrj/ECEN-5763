@@ -23,7 +23,7 @@ $(shell mkdir -p $(BUILD) &> /dev/null)
 
 .PRECIOUS : $(BUILD)/%.o
 
-all: $(BIN)/houghlines
+all: $(BIN)/houghlines remote
 
 $(BUILD)/%.o : %.cpp
 	$(CPP) $(CPPFLAGS) -c -o $@ $<
@@ -31,5 +31,10 @@ $(BUILD)/%.o : %.cpp
 $(BIN)/%: $(BUILD)/%.o
 	$(CPP) $(CPPFLAGS) $< -o $@ `pkg-config --libs opencv4` $(CPPLIBS)
 
+.PHONY:
+remote:
+	@tar zcvf q2.tar.gz ${CPPSOURCE} Makefile
+
 clean:
 	rm -rf $(BIN) $(BUILD)
+	rm -f q2.tar.gz
