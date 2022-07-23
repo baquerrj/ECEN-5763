@@ -12,17 +12,20 @@ const String LineDetector::DETECTED_LANES_IMAGE = "Detected Lanes (in red)";
 const String LineDetector::DETECTED_VEHICLES_IMAGE = "Detected Vehicles";
 const String LineDetector::CAR_CLASSIFIER = "cars.xml";
 
-void LineDetector::applyHoughlines()
+void LineDetector::prepareImage()
 {
-    // Edge detection
-    Canny( mySource, tmp, 50, 200, 3 );
+    cvtColor( mySource, myGrayscaleImage, COLOR_RGB2GRAY );
+    GaussianBlur( mySource, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
+    Canny( tmp, myCannyOutput, 40, 120, 3, true );
+    cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
+    cvtColor( myCannyOutput, myVehiclesImage, COLOR_GRAY2RGB );
+}
 
-    // Copy edges to the images that will display the results in BGR
-    cvtColor( tmp, myLanesImage, COLOR_GRAY2BGR );
-
+void LineDetector::detectLanes()
+{
     // Probabilistic Line Transform
     vector<Vec4i> linesP; // will hold the results of the detection
-    HoughLinesP( tmp, linesP, 1, CV_PI / 180, myHoughLinesPThreshold, myMinLineLength, myMaxLineGap ); // runs the actual detection
+    HoughLinesP( myCannyOutput, linesP, 1, CV_PI / 180, 70, 10, 50 ); // runs the actual detection
     // Draw the lines
     for( size_t i = 0; i < linesP.size(); i++ )
     {
@@ -33,6 +36,21 @@ void LineDetector::applyHoughlines()
     return;
 }
 
+void LineDetector::detectCars()
+{
+    vector<Rect> vehicle;
+    myClassifier.detectMultiScale( myGrayscaleImage, vehicle );
+
+    if( vehicle.size() > 0 )
+    {
+        printf( "Detected %ld vehicles\n\r", vehicle.size() );
+    }
+    for( size_t i = 0; i < vehicle.size(); ++i )
+    {
+        rectangle( myVehiclesImage, vehicle[i], CV_RGB( 255, 0, 0 ) );
+    }
+}
+
 static const char* keys = {
     "{camera        c|false|use camera as source. If omitted, path to file must be supplied.}"
     "{show           |false|show intermediate steps}"
@@ -40,7 +58,7 @@ static const char* keys = {
     "{video         v|./videos/GP010639.MP4|video source}"
 };
 
-void printHelp( CommandLineParser * p_parser )
+void printHelp( CommandLineParser* p_parser )
 {
     printf( "The program uses the standard and probabilistic Hough algorithms to detect lines\n" );
     p_parser->printMessage();
@@ -71,7 +89,7 @@ int main( int argc, char** argv )
             printf( "Using %s as source\n\r", videoInput.c_str() );
         }
     }
-    LineDetector* detector = new LineDetector( useCamera, 0, 640, 480, videoInput );
+    LineDetector* detector = new LineDetector( useCamera, 0, videoInput );
 
     if( detector == NULL )
     {
@@ -95,12 +113,16 @@ int main( int argc, char** argv )
         {
             break;
         }
-        detector->applyHoughlines();
+        detector->prepareImage();
+        detector->detectLanes();
+        detector->detectCars();
+
         framesProcessed++;
 
         //![imshow]
         // Show results
         detector->showLanesImage();
+        detector->showVehiclesImage();
         detector->showSourceImage();
         //![imshow]
         if( ( winInput = waitKey( 2 ) ) == 27 )
