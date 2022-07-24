@@ -7,7 +7,7 @@
 
 static const char* keys = {
     "{help          h|false|show help message}"
-    "{@input         |./videos/GP010639.MP4|path to test video to process}"
+    "{@input         |./videos/22400003.AVI|path to test video to process}"
     "{store          ||path to create processed output video}"
     "{show           |false|show intermediate steps}"
 };

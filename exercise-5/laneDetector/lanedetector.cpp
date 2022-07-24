@@ -42,10 +42,6 @@ void LineDetector::detectCars()
     vector<Rect> vehicle;
     myClassifier.detectMultiScale( myGrayscaleImage, vehicle );
 
-    if( vehicle.size() > 0 )
-    {
-        printf( "Detected %ld vehicles\n\r", vehicle.size() );
-    }
     for( size_t i = 0; i < vehicle.size(); ++i )
     {
         rectangle( myVehiclesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
