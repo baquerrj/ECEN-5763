@@ -3,7 +3,11 @@
  * @brief This program demonstrates line finding with the Hough transform
  */
 
-#include "houghlines.hpp"
+#include "lanedetector.hpp"
+
+#include <stdio.h>
+#include <time.h>
+#include <memory>
 
 using namespace std;
 
@@ -52,17 +56,18 @@ void LineDetector::detectCars()
 }
 
 static const char* keys = {
-    "{camera        c|false|use camera as source. If omitted, path to file must be supplied.}"
-    "{show           |false|show intermediate steps}"
     "{help          h|false|show help message}"
-    "{video         v|./videos/GP010639.MP4|video source}"
+    "{@input         |./videos/GP010639.MP4|path to test video to process}"
+    "{store          ||path to create processed output video}"
+    "{show           |false|show intermediate steps}"
 };
 
 void printHelp( CommandLineParser* p_parser )
 {
-    printf( "The program uses the standard and probabilistic Hough algorithms to detect lines\n" );
+    printf( "The program uses Hough line detection and Haar feature detection to identify and mark\n"
+            "road lanes and cars on a video stream input\n\r" );
     p_parser->printMessage();
-    printf( "Press the ESC key to exit the program.\n" );
+    printf( "Press the ESC key to exit the program.\n\r" );
 }
 
 int main( int argc, char** argv )
@@ -74,22 +79,23 @@ int main( int argc, char** argv )
         exit( 0 );
     }
 
-    bool useCamera = parser.get<bool>( "camera" );
-    String videoInput = parser.get<String>( "video" );
+    bool show = parser.get<bool>( "show" );
+    bool doStore = parser.has( "store" );
+    String store = parser.get<String>( "store" );
+    String videoInput = parser.get<String>( "@input" );
 
-    if( not useCamera )
+    if( videoInput.empty() )
     {
-        if( videoInput.empty() )
-        {
-            printf( "Missing --video=[PATH] option when not using camera as input!\n\r" );
-            exit( -1 );
-        }
-        else
-        {
-            printf( "Using %s as source\n\r", videoInput.c_str() );
-        }
+        printf( "Missing path to test video!\n\r" );
+        printHelp( &parser );
+        exit( -1 );
     }
-    LineDetector* detector = new LineDetector( useCamera, 0, videoInput );
+    else
+    {
+        printf( "Using %s as source\n\r", videoInput.c_str() );
+    }
+
+    LineDetector* detector = new LineDetector( 0, videoInput );
 
     if( detector == NULL )
     {
@@ -108,7 +114,7 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        detector->readCameraFrame();
+        detector->readFrame();
         if( detector->isFrameEmpty() )
         {
             break;
@@ -119,13 +125,19 @@ int main( int argc, char** argv )
 
         framesProcessed++;
 
-        //![imshow]
-        // Show results
-        detector->showLanesImage();
-        detector->showVehiclesImage();
-        detector->showSourceImage();
-        //![imshow]
-        if( ( winInput = waitKey( 2 ) ) == 27 )
+        if( show )
+        {
+            detector->showLanesImage();
+            detector->showVehiclesImage();
+            detector->showSourceImage();
+        }
+        else
+        {
+            detector->showLanesImage();
+        }
+
+        winInput = waitKey( 2 );
+        if( winInput == 27 )
         {
             break;
         }

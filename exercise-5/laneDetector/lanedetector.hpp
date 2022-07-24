@@ -1,12 +1,10 @@
+#ifndef __LANE_DETECTOR_HPP__
+#define __LANE_DETECTOR_HPP__
 
-#include <stdio.h>
-#include <time.h>
-#include <memory>
-
-#include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/objdetect.hpp"
+
 static const int min_threshold = 50;
 static const int min_linelength = 50;
 static const int min_maxlinegap = 50;
@@ -37,17 +35,15 @@ class LineDetector
     static const bool DEFAULT_USE_CAMERA = false;
 
     public:
-    LineDetector( bool useCamera,
-                  int deviceId,
+    LineDetector( int deviceId,
                   int frameWidth,
                   int frameHeight,
-                  const String videoInput = "" )
+                  const String videoFilename = "" )
     {
         myFrameHeight = frameHeight;
         myFrameWidth = frameWidth;
-        myUseCamera = useCamera;
         myDeviceId = deviceId;
-        myVideoInput = videoInput;
+        myVideoFilename = videoFilename;
 
         myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
         myMaxLineGap = INITIAL_MAX_LINE_LAP;
@@ -56,15 +52,13 @@ class LineDetector
         initialize();
     }
 
-    LineDetector( bool useCamera,
-                  int deviceId,
-                  const String videoInput = "" )
+    LineDetector( int deviceId,
+                  const String videoFilename = "" )
     {
         myFrameHeight = DEFAULT_FRAME_HEIGHT;
         myFrameWidth = DEFAULT_FRAME_WIDTH;
-        myUseCamera = useCamera;
         myDeviceId = deviceId;
-        myVideoInput = videoInput;
+        myVideoFilename = videoFilename;
 
         myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
         myMaxLineGap = INITIAL_MAX_LINE_LAP;
@@ -75,35 +69,20 @@ class LineDetector
 
     ~LineDetector()
     {
-        if( myCamera.isOpened() )
+        if( myVideoCapture.isOpened() )
         {
-            myCamera.release();
+            myVideoCapture.release();
         }
         destroyAllWindows();
     }
 
     inline void initialize()
     {
-        if( myUseCamera )
-        {
-            myCamera = VideoCapture( myDeviceId );
-            if( !myCamera.isOpened() )
-            {
-                printf( "Error opening camera %d\n\r", myDeviceId );
-                exit( -1 );
-            }
-            myCamera.set( CAP_PROP_FRAME_WIDTH, myFrameWidth );
-            myCamera.set( CAP_PROP_FRAME_HEIGHT, myFrameHeight );
-            printf( "Opened camera\n\r" );
-        }
-        else
-        {
-            myCamera = VideoCapture( myVideoInput );
-        }
+        myVideoCapture = VideoCapture( myVideoFilename );
 
         createWindows( myFrameWidth, myFrameHeight );
-
     }
+
     inline bool loadClassifier( const String classifier )
     {
         myClassifier.load( classifier );
@@ -135,9 +114,9 @@ class LineDetector
         printf( "Created window: %s\n\r", DETECTED_VEHICLES_IMAGE.c_str() );
     }
 
-    inline void readCameraFrame()
+    inline void readFrame()
     {
-        myCamera.read( mySource );
+        myVideoCapture.read( mySource );
     }
 
     inline bool isFrameEmpty()
@@ -182,7 +161,7 @@ class LineDetector
 
     private:
     Mat mySource;
-    VideoCapture myCamera;
+    VideoCapture myVideoCapture;
     int myHoughLinesPThreshold;
     int myMinLineLength;
     int myMaxLineGap;
@@ -195,10 +174,11 @@ class LineDetector
 
     int myFrameWidth;
     int myFrameHeight;
-    bool myUseCamera;
     int myDeviceId;
-    String myVideoInput;
+    String myVideoFilename;
 
     public:
     CascadeClassifier myClassifier;
 };
+
+#endif // __LANE_DETECTOR_HPP__

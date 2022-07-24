@@ -12,7 +12,7 @@ CFLAGS = -Wall -c -I.
 CPPFLAGS = -Wall -Wextra -Wshadow -Wundef -fno-common $(CPPINCLUDE_DIRS)
 LFLAGS = -Wall
 
-CPPSOURCE = houghlines.cpp
+CPPSOURCE = lanedetector.cpp
 
 CPPBIN =
 
@@ -23,7 +23,7 @@ $(shell mkdir -p $(BUILD) &> /dev/null)
 
 .PRECIOUS : $(BUILD)/%.o
 
-all: $(BIN)/houghlines
+all: $(BIN)/lanedetector
 
 $(BUILD)/%.o : %.cpp
 	$(CPP) $(CPPFLAGS) -c -o $@ $<
