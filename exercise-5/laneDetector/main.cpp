@@ -30,6 +30,7 @@ int main( int argc, char** argv )
     }
 
     bool show = parser.get<bool>( "show" );
+    bool doStore = parser.has( "store" );
     String store = parser.get<String>( "store" );
     String videoInput = parser.get<String>( "@input" );
 
@@ -44,7 +45,11 @@ int main( int argc, char** argv )
         printf( "Using %s as source\n\r", videoInput.c_str() );
     }
 
-    LineDetector* detector = new LineDetector( 0, videoInput );
+    LineDetector* detector = new LineDetector( LineDetector::DEFAULT_DEVICE_ID,
+                                                videoInput,
+                                                doStore,
+                                                store );
+
 
     if( detector == NULL )
     {
@@ -85,6 +90,11 @@ int main( int argc, char** argv )
             detector->showLanesImage();
         }
 
+        if( doStore )
+        {
+            detector->writeFrameToVideo();
+        }
+
         winInput = waitKey( 2 );
         if( winInput == 27 )
         {
@@ -97,5 +107,6 @@ int main( int argc, char** argv )
         delete detector;
     }
 
+    // video.release();
     return 0;
 }

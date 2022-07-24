@@ -36,9 +36,11 @@ class LineDetector
 
     public:
     LineDetector( int deviceId,
-                  int frameWidth,
-                  int frameHeight,
-                  const String videoFilename = "" )
+                  const String videoFilename = "",
+                  bool writeOutputVideo = false,
+                  const String outputVideoFilename = "",
+                  int frameWidth = DEFAULT_FRAME_WIDTH,
+                  int frameHeight = DEFAULT_FRAME_HEIGHT )
     {
         myFrameHeight = frameHeight;
         myFrameWidth = frameWidth;
@@ -49,22 +51,26 @@ class LineDetector
         myMaxLineGap = INITIAL_MAX_LINE_LAP;
         myMinLineLength = INITIAL_MIN_LINE_LENGTH;
 
-        initialize();
-    }
+        myVideoCapture = VideoCapture( myVideoFilename );
 
-    LineDetector( int deviceId,
-                  const String videoFilename = "" )
-    {
-        myFrameHeight = DEFAULT_FRAME_HEIGHT;
-        myFrameWidth = DEFAULT_FRAME_WIDTH;
-        myDeviceId = deviceId;
-        myVideoFilename = videoFilename;
+        myVideoCapture.set( CAP_PROP_FRAME_HEIGHT, (double)frameHeight );
+        myVideoCapture.set( CAP_PROP_FRAME_WIDTH, (double)frameWidth );
 
-        myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
-        myMaxLineGap = INITIAL_MAX_LINE_LAP;
-        myMinLineLength = INITIAL_MIN_LINE_LENGTH;
+        createWindows();
 
-        initialize();
+        if( writeOutputVideo )
+        {
+            myOutputVideoFilename = outputVideoFilename;
+            if( myOutputVideoFilename.empty() or myOutputVideoFilename == "" )
+            {
+                myOutputVideoFilename = "output.avi";
+            }
+            myVideoWriter.open( myOutputVideoFilename,
+                                VideoWriter::fourcc( 'M', 'J', 'P', 'G' ),
+                                getFrameRate(),
+                                Size( getFrameWidth(), getFrameHeight() ),
+                                true );
+        }
     }
 
     ~LineDetector()
@@ -73,85 +79,42 @@ class LineDetector
         {
             myVideoCapture.release();
         }
+
+        if( myVideoWriter.isOpened() )
+        {
+            myVideoWriter.release();
+        }
+
         destroyAllWindows();
     }
 
-    inline void initialize()
-    {
-        myVideoCapture = VideoCapture( myVideoFilename );
+    bool loadClassifier( const String& classifier );
 
-        createWindows( myFrameWidth, myFrameHeight );
-    }
+    void createWindows();
 
-    inline bool loadClassifier( const String classifier )
-    {
-        myClassifier.load( classifier );
+    void readFrame();
 
-        if( myClassifier.empty() )
-        {
-            printf( "Failed to load classifier from %s\n\r", classifier.c_str() );
-            return false;
-        }
-        else
-        {
-            return true;
-        }
-    }
+    bool isFrameEmpty();
 
-    inline void createWindows( int frameWidth, int frameHeight )
-    {
+    void showSourceImage();
 
-        namedWindow( SOURCE_WINDOW_NAME, WINDOW_NORMAL );
-        resizeWindow( SOURCE_WINDOW_NAME, Size( frameWidth, frameHeight ) );
-        printf( "Created window: %s\n\r", SOURCE_WINDOW_NAME.c_str() );
+    void showLanesImage();
 
-        namedWindow( DETECTED_LANES_IMAGE, WINDOW_NORMAL );
-        resizeWindow( DETECTED_LANES_IMAGE, Size( frameWidth, frameHeight ) );
-        printf( "Created window: %s\n\r", DETECTED_LANES_IMAGE.c_str() );
+    void showVehiclesImage();
 
-        namedWindow( DETECTED_VEHICLES_IMAGE, WINDOW_NORMAL );
-        resizeWindow( DETECTED_VEHICLES_IMAGE, Size( frameWidth, frameHeight ) );
-        printf( "Created window: %s\n\r", DETECTED_VEHICLES_IMAGE.c_str() );
-    }
+    void setHoughLinesPThreshold( int value );
 
-    inline void readFrame()
-    {
-        myVideoCapture.read( mySource );
-    }
+    void setMinLineLength( int value );
 
-    inline bool isFrameEmpty()
-    {
-        return mySource.empty();
-    }
+    void setMaxLineGap( int value );
 
+    Mat getVehiclesImage();
 
-    inline void showSourceImage()
-    {
-        imshow( SOURCE_WINDOW_NAME, mySource );
-    }
+    int getFrameRate();
 
-    inline void showLanesImage()
-    {
-        imshow( DETECTED_LANES_IMAGE, myLanesImage );
-    }
+    int getFrameWidth();
 
-    inline void showVehiclesImage()
-    {
-        imshow( DETECTED_VEHICLES_IMAGE, myVehiclesImage );
-    }
-
-    inline void setHoughLinesPThreshold( int value )
-    {
-        myHoughLinesPThreshold = value;
-    }
-    inline void setMinLineLength( int value )
-    {
-        myMinLineLength = value;
-    }
-    inline void setMaxLineGap( int value )
-    {
-        myMaxLineGap = value;
-    }
+    int getFrameHeight();
 
     void prepareImage();
 
@@ -159,9 +122,12 @@ class LineDetector
 
     void detectCars();
 
+    void writeFrameToVideo();
+
     private:
     Mat mySource;
     VideoCapture myVideoCapture;
+    VideoWriter myVideoWriter;
     int myHoughLinesPThreshold;
     int myMinLineLength;
     int myMaxLineGap;
@@ -176,8 +142,8 @@ class LineDetector
     int myFrameHeight;
     int myDeviceId;
     String myVideoFilename;
+    String myOutputVideoFilename;
 
-    public:
     CascadeClassifier myClassifier;
 };
 

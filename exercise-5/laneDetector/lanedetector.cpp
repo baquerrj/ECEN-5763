@@ -6,7 +6,6 @@
 #include "lanedetector.hpp"
 
 
-
 using namespace std;
 
 const String LineDetector::SOURCE_WINDOW_NAME = "Source";
@@ -31,8 +30,8 @@ void LineDetector::detectLanes()
     // Draw the lines
     for( size_t i = 0; i < linesP.size(); i++ )
     {
-        Vec4i l = linesP[i];
-        line( myLanesImage, Point( l[0], l[1] ), Point( l[2], l[3] ), Scalar( 0, 0, 255 ), 3, LINE_AA );
+        Vec4i l = linesP[ i ];
+        line( myLanesImage, Point( l[ 0 ], l[ 1 ] ), Point( l[ 2 ], l[ 3 ] ), Scalar( 0, 0, 255 ), 3, LINE_AA );
     }
 
     return;
@@ -49,101 +48,102 @@ void LineDetector::detectCars()
     }
     for( size_t i = 0; i < vehicle.size(); ++i )
     {
-        rectangle( myVehiclesImage, vehicle[i], CV_RGB( 255, 0, 0 ) );
+        rectangle( myVehiclesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
     }
 }
 
-// static const char* keys = {
-//     "{help          h|false|show help message}"
-//     "{@input         |./videos/GP010639.MP4|path to test video to process}"
-//     "{store          ||path to create processed output video}"
-//     "{show           |false|show intermediate steps}"
-// };
+bool LineDetector::loadClassifier( const String& classifier )
+{
+    myClassifier.load( classifier );
 
-// void printHelp( CommandLineParser* p_parser )
-// {
-//     printf( "The program uses Hough line detection and Haar feature detection to identify and mark\n"
-//             "road lanes and cars on a video stream input\n\r" );
-//     p_parser->printMessage();
-//     printf( "Press the ESC key to exit the program.\n\r" );
-// }
+    if( myClassifier.empty() )
+    {
+        printf( "Failed to load classifier from %s\n\r", classifier.c_str() );
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
 
-// int main( int argc, char** argv )
-// {
-//     CommandLineParser parser( argc, argv, keys );
-//     if( parser.get<bool>( "help" ) )
-//     {
-//         printHelp( &parser );
-//         exit( 0 );
-//     }
+void LineDetector::writeFrameToVideo()
+{
+    myVideoWriter.write(myVehiclesImage);
+}
 
-//     bool show = parser.get<bool>( "show" );
-//     String store = parser.get<String>( "store" );
-//     String videoInput = parser.get<String>( "@input" );
+void LineDetector::createWindows()
+{
 
-//     if( videoInput.empty() )
-//     {
-//         printf( "Missing path to test video!\n\r" );
-//         printHelp( &parser );
-//         exit( -1 );
-//     }
-//     else
-//     {
-//         printf( "Using %s as source\n\r", videoInput.c_str() );
-//     }
+    namedWindow( SOURCE_WINDOW_NAME, WINDOW_NORMAL );
+    resizeWindow( SOURCE_WINDOW_NAME, Size( myFrameWidth, myFrameHeight ) );
+    printf( "Created window: %s\n\r", SOURCE_WINDOW_NAME.c_str() );
 
-//     LineDetector* detector = new LineDetector( 0, videoInput );
+    namedWindow( DETECTED_LANES_IMAGE, WINDOW_NORMAL );
+    resizeWindow( DETECTED_LANES_IMAGE, Size( myFrameWidth, myFrameHeight ) );
+    printf( "Created window: %s\n\r", DETECTED_LANES_IMAGE.c_str() );
 
-//     if( detector == NULL )
-//     {
-//         exit( -1 );
-//     }
+    namedWindow( DETECTED_VEHICLES_IMAGE, WINDOW_NORMAL );
+    resizeWindow( DETECTED_VEHICLES_IMAGE, Size( myFrameWidth, myFrameHeight ) );
+    printf( "Created window: %s\n\r", DETECTED_VEHICLES_IMAGE.c_str() );
+}
 
-//     if( not detector->loadClassifier( LineDetector::CAR_CLASSIFIER ) )
-//     {
-//         delete detector;
-//         exit( -1 );
-//     }
+void LineDetector::readFrame()
+{
+    myVideoCapture.read( mySource );
+}
 
-//     char winInput;
+bool LineDetector::isFrameEmpty()
+{
+    return mySource.empty();
+}
 
-//     int framesProcessed = 0;
+void LineDetector::showSourceImage()
+{
+    imshow( SOURCE_WINDOW_NAME, mySource );
+}
 
-//     while( true )
-//     {
-//         detector->readFrame();
-//         if( detector->isFrameEmpty() )
-//         {
-//             break;
-//         }
-//         detector->prepareImage();
-//         detector->detectLanes();
-//         detector->detectCars();
+void LineDetector::showLanesImage()
+{
+    imshow( DETECTED_LANES_IMAGE, myLanesImage );
+}
 
-//         framesProcessed++;
+void LineDetector::showVehiclesImage()
+{
+    imshow( DETECTED_VEHICLES_IMAGE, myVehiclesImage );
+}
 
-//         if( show )
-//         {
-//             detector->showLanesImage();
-//             detector->showVehiclesImage();
-//             detector->showSourceImage();
-//         }
-//         else
-//         {
-//             detector->showLanesImage();
-//         }
+void LineDetector::setHoughLinesPThreshold( int value )
+{
+    myHoughLinesPThreshold = value;
+}
 
-//         winInput = waitKey( 2 );
-//         if( winInput == 27 )
-//         {
-//             break;
-//         }
-//     }
+void LineDetector::setMinLineLength( int value )
+{
+    myMinLineLength = value;
+}
 
-//     if( detector != NULL )
-//     {
-//         delete detector;
-//     }
+void LineDetector::setMaxLineGap( int value )
+{
+    myMaxLineGap = value;
+}
 
-//     return 0;
-// }
+Mat LineDetector::getVehiclesImage()
+{
+    return myVehiclesImage;
+}
+
+int LineDetector::getFrameRate()
+{
+    return myVideoCapture.get( CAP_PROP_FPS );
+}
+
+int LineDetector::getFrameWidth()
+{
+    return myVideoCapture.get( CAP_PROP_FRAME_WIDTH );
+}
+
+int LineDetector::getFrameHeight()
+{
+    return myVideoCapture.get( CAP_PROP_FRAME_HEIGHT );
+}
