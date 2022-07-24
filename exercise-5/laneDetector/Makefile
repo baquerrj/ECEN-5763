@@ -1,40 +1,46 @@
-#
-# Basic OpenCV example tested on Ubuntu
-#
+CXX      := -c++
+CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror
+LDFLAGS  := -L/usr/lib -lstdc++ -lm $(shell pkg-config --libs opencv4)
+BUILD    := ./build
+BIN		 := ./bin
+OBJ_DIR  := $(BUILD)/objects
+APP_DIR  := $(BIN)
+TARGET   := lanedetector
+INCLUDE  := -I./ $(shell pkg-config --cflags opencv4)
+SRC      :=						\
+   $(wildcard *.cpp)			\
+   $(wildcard src/*.cpp)
 
-CPPINCLUDE_DIRS =  -I. -I/usr/include/opencv2 -I/usr/include/opencv4 -I/usr/include/opencv
-#CPPLIBS = -L/usr/lib -lopencv_core -lopencv_flann -lopencv_video
-CPPLIBS = -L/usr/lib
-LIBS =
+OBJECTS  := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+DEPENDENCIES \
+         := $(OBJECTS:.o=.d)
 
-CPP = g++
-CFLAGS = -Wall -c -I.
-CPPFLAGS = -Wall -Wextra -Wshadow -Wundef -fno-common $(CPPINCLUDE_DIRS)
-LFLAGS = -Wall
+all: CXXFLAGS += -O2
+all: build $(APP_DIR)/$(TARGET)
 
-CPPSOURCE = lanedetector.cpp
+$(OBJ_DIR)/%.o: %.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -MMD -o $@
 
-CPPBIN =
+$(APP_DIR)/$(TARGET): $(OBJECTS)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -o $(APP_DIR)/$(TARGET) $^ $(LDFLAGS)
 
-BIN = ./bin
-$(shell mkdir -p $(BIN) &> /dev/null)
-BUILD = ./build
-$(shell mkdir -p $(BUILD) &> /dev/null)
+-include $(DEPENDENCIES)
 
-.PRECIOUS : $(BUILD)/%.o
+.PHONY: all build clean info
 
-all: $(BIN)/lanedetector
-
-$(BUILD)/%.o : %.cpp
-	$(CPP) $(CPPFLAGS) -c -o $@ $<
-
-$(BIN)/%: $(BUILD)/%.o
-	$(CPP) $(CPPFLAGS) $< -o $@ `pkg-config --libs opencv4` $(CPPLIBS)
-
-.PHONY:
-remote:
-	@tar zcvf code.tgz ${CPPSOURCE} Makefile
+build:
+	@mkdir -p $(OBJ_DIR)
+	@mkdir -p $(BIN)
 
 clean:
-	rm -rf $(BIN) $(BUILD)
-	rm -f code.tgz
+	-@rm -rvf $(BUILD)
+	-@rm -rvf $(BIN)
+
+info:
+	@echo "[*] Application dir: ${APP_DIR}     "
+	@echo "[*] Object dir:      ${OBJ_DIR}     "
+	@echo "[*] Sources:         ${SRC}         "
+	@echo "[*] Objects:         ${OBJECTS}     "
+	@echo "[*] Dependencies:    ${DEPENDENCIES}"
