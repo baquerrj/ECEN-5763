@@ -28,7 +28,7 @@ $(APP_DIR)/$(TARGET): $(OBJECTS)
 
 -include $(DEPENDENCIES)
 
-.PHONY: all build clean info
+.PHONY: all build clean info remote
 
 build:
 	@mkdir -p $(OBJ_DIR)
@@ -38,6 +38,11 @@ clean:
 	-@rm -rvf $(BUILD)
 	-@rm -rvf $(BIN)
 
+remote: $(SRC) Makefile cars.xml
+	-@cd ../ && tar --exclude='laneDetector/bin' \
+	--exclude='laneDetector/build' \
+	--exclude='laneDetector/*.avi' \
+	-zcvf laneDetector.tgz laneDetector
 info:
 	@echo "[*] Application dir: ${APP_DIR}     "
 	@echo "[*] Object dir:      ${OBJ_DIR}     "
