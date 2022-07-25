@@ -5,6 +5,15 @@
 #include <time.h>
 #include <memory>
 
+double delta_t( struct timespec* stop, struct timespec* start )
+{
+    double current = ( ( double )stop->tv_sec * 1000.0 ) +
+        ( ( double )( ( double )stop->tv_nsec / 1000000.0 ) );
+    double last = ( ( double )start->tv_sec * 1000.0 ) +
+        ( ( double )( ( double )start->tv_nsec / 1000000.0 ) );
+    return ( current - last );
+}
+
 static const char* keys = {
     "{help          h|false|show help message}"
     "{@input         |./videos/22400003.AVI|path to test video to process}"
@@ -65,6 +74,9 @@ int main( int argc, char** argv )
     char winInput;
 
     int framesProcessed = 0;
+    struct timespec start = { 0, 0 };
+    struct timespec stop = { 0, 0 };
+    clock_gettime( CLOCK_REALTIME, &start );
 
     while( true )
     {
@@ -101,6 +113,12 @@ int main( int argc, char** argv )
             break;
         }
     }
+    clock_gettime( CLOCK_REALTIME, &stop );
+    double deltas = delta_t( &stop, &start );
+    double deltaTMS = deltas / framesProcessed;
+    double deltaT = deltaTMS / 1000.0;
+    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
 
     if( detector != NULL )
     {

@@ -65,7 +65,7 @@ bool LineDetector::loadClassifier( const String& classifier )
 
 void LineDetector::writeFrameToVideo()
 {
-    myVideoWriter.write(myVehiclesImage);
+    myVideoWriter.write( myVehiclesImage );
 }
 
 void LineDetector::createWindows()

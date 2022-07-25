@@ -1,6 +1,6 @@
 CXX      := -c++
 CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror
-LDFLAGS  := -L/usr/lib -lstdc++ -lm $(shell pkg-config --libs opencv4)
+LDFLAGS  := -L/usr/lib -lstdc++ -lm $(shell pkg-config --libs opencv4) -pthread
 BUILD    := ./build
 BIN		 := ./bin
 OBJ_DIR  := $(BUILD)/objects
