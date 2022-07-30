@@ -1,4 +1,4 @@
-CXX      := -c++
+CXX      := g++
 CXXFLAGS := -pedantic-errors -Wall -Wextra -Werror
 LDFLAGS  := -L/usr/lib -lstdc++ -lm $(shell pkg-config --libs opencv4) -pthread
 BUILD    := ./build
@@ -15,8 +15,15 @@ OBJECTS  := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 DEPENDENCIES \
          := $(OBJECTS:.o=.d)
 
-all: CXXFLAGS += -O2
+.PHONY: all build clean info remote debug release
+
 all: build $(APP_DIR)/$(TARGET)
+
+debug: CXXFLAGS += -O0 -g
+debug: all
+
+release: CXXFLAGS += -O2
+release: all
 
 $(OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
@@ -27,8 +34,6 @@ $(APP_DIR)/$(TARGET): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $(APP_DIR)/$(TARGET) $^ $(LDFLAGS)
 
 -include $(DEPENDENCIES)
-
-.PHONY: all build clean info remote
 
 build:
 	@mkdir -p $(OBJ_DIR)
@@ -43,6 +48,7 @@ remote: $(SRC) Makefile cars.xml
 	--exclude='laneDetector/build' \
 	--exclude='laneDetector/*.avi' \
 	-zcvf laneDetector.tgz laneDetector
+
 info:
 	@echo "[*] Application dir: ${APP_DIR}     "
 	@echo "[*] Object dir:      ${OBJ_DIR}     "

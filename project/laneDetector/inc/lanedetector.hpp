@@ -11,6 +11,11 @@ static const int min_maxlinegap = 50;
 
 using namespace cv;
 
+#include <semaphore.h>
+
+class CyclicThread;
+struct ThreadConfigData;
+
 
 class LineDetector
 {
@@ -35,58 +40,15 @@ class LineDetector
     static const bool DEFAULT_USE_CAMERA = false;
 
     public:
-    LineDetector( int deviceId,
+    LineDetector( const ThreadConfigData configData,
+                  int deviceId,
                   const String videoFilename = "",
                   bool writeOutputVideo = false,
                   const String outputVideoFilename = "",
                   int frameWidth = DEFAULT_FRAME_WIDTH,
-                  int frameHeight = DEFAULT_FRAME_HEIGHT )
-    {
-        myFrameHeight = frameHeight;
-        myFrameWidth = frameWidth;
-        myDeviceId = deviceId;
-        myVideoFilename = videoFilename;
+                  int frameHeight = DEFAULT_FRAME_HEIGHT );
 
-        myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
-        myMaxLineGap = INITIAL_MAX_LINE_LAP;
-        myMinLineLength = INITIAL_MIN_LINE_LENGTH;
-
-        myVideoCapture = VideoCapture( myVideoFilename );
-
-        myVideoCapture.set( CAP_PROP_FRAME_HEIGHT, (double)frameHeight );
-        myVideoCapture.set( CAP_PROP_FRAME_WIDTH, (double)frameWidth );
-
-        createWindows();
-
-        if( writeOutputVideo )
-        {
-            myOutputVideoFilename = outputVideoFilename;
-            if( myOutputVideoFilename.empty() or myOutputVideoFilename == "" )
-            {
-                myOutputVideoFilename = "output.avi";
-            }
-            myVideoWriter.open( myOutputVideoFilename,
-                                VideoWriter::fourcc( 'M', 'J', 'P', 'G' ),
-                                getFrameRate(),
-                                Size( getFrameWidth(), getFrameHeight() ),
-                                true );
-        }
-    }
-
-    ~LineDetector()
-    {
-        if( myVideoCapture.isOpened() )
-        {
-            myVideoCapture.release();
-        }
-
-        if( myVideoWriter.isOpened() )
-        {
-            myVideoWriter.release();
-        }
-
-        destroyAllWindows();
-    }
+    virtual ~LineDetector();
 
     bool loadClassifier( const String& classifier );
 
@@ -124,6 +86,16 @@ class LineDetector
 
     void writeFrameToVideo();
 
+    bool newFrameReady();
+    virtual void shutdown();
+    virtual bool isAlive();
+    virtual bool isThreadAlive();
+    virtual pthread_t getThreadId();
+    virtual sem_t* getSemaphore();
+
+    static void* execute( void* context );
+
+
     private:
     Mat mySource;
     VideoCapture myVideoCapture;
@@ -131,6 +103,7 @@ class LineDetector
     int myHoughLinesPThreshold;
     int myMinLineLength;
     int myMaxLineGap;
+    bool myNewFrameReady;
 
     Mat tmp;
     Mat myLanesImage;
@@ -145,6 +118,14 @@ class LineDetector
     String myOutputVideoFilename;
 
     CascadeClassifier myClassifier;
+
+    protected:
+    std::string name;
+    bool alive;
+    sem_t sem;
+    CyclicThread* thread;
+
 };
+
 
 #endif // __LANE_DETECTOR_HPP__

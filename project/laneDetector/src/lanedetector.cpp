@@ -4,14 +4,95 @@
  */
 
 #include "lanedetector.hpp"
-
-
+#include "configuration.hpp"
+#include "thread.hpp"
+#include "thread_utils.hpp"
+#include "logging.hpp"
+#include "string.h"
 using namespace std;
+
+extern pthread_mutex_t cameraLock;
 
 const String LineDetector::SOURCE_WINDOW_NAME = "Source";
 const String LineDetector::DETECTED_LANES_IMAGE = "Detected Lanes (in red)";
 const String LineDetector::DETECTED_VEHICLES_IMAGE = "Detected Vehicles";
 const String LineDetector::CAR_CLASSIFIER = "cars.xml";
+
+LineDetector::LineDetector( const ThreadConfigData configData,
+                  int deviceId,
+                  const String videoFilename,
+                  bool writeOutputVideo,
+                  const String outputVideoFilename,
+                  int frameWidth,
+                  int frameHeight )
+{
+    myFrameHeight = frameHeight;
+    myFrameWidth = frameWidth;
+    myDeviceId = deviceId;
+    myVideoFilename = videoFilename;
+
+    myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
+    myMaxLineGap = INITIAL_MAX_LINE_LAP;
+    myMinLineLength = INITIAL_MIN_LINE_LENGTH;
+
+    myVideoCapture = VideoCapture( myVideoFilename );
+
+    myVideoCapture.set( CAP_PROP_FRAME_HEIGHT, ( double )frameHeight );
+    myVideoCapture.set( CAP_PROP_FRAME_WIDTH, ( double )frameWidth );
+
+    createWindows();
+
+    if( writeOutputVideo )
+    {
+        myOutputVideoFilename = outputVideoFilename;
+        if( myOutputVideoFilename.empty() or myOutputVideoFilename == "" )
+        {
+            myOutputVideoFilename = "output.avi";
+        }
+        myVideoWriter.open( myOutputVideoFilename,
+                            VideoWriter::fourcc( 'M', 'J', 'P', 'G' ),
+                            getFrameRate(),
+                            Size( getFrameWidth(), getFrameHeight() ),
+                            true );
+    }
+
+    myNewFrameReady = false;
+    thread = new CyclicThread( configData,
+                                LineDetector::execute,
+                                this,
+                                true );
+    if( NULL == thread )
+    {
+        logging::ERROR( "Could not allocated memory for " + configData.threadName );
+        exit( -1 );
+    }
+}
+
+LineDetector::~LineDetector()
+{
+    if( myVideoCapture.isOpened() )
+    {
+        myVideoCapture.release();
+    }
+
+    if( myVideoWriter.isOpened() )
+    {
+        myVideoWriter.release();
+    }
+
+    destroyAllWindows();
+
+    if( thread )
+    {
+        delete thread;
+    }
+}
+
+void* LineDetector::execute( void* context )
+{
+    ( (LineDetector*)context )->readFrame();
+    return NULL;
+}
 
 void LineDetector::prepareImage()
 {
@@ -86,7 +167,21 @@ void LineDetector::createWindows()
 
 void LineDetector::readFrame()
 {
+    while( abortS1 )
+    {
+        thread->shutdown();
+        return;
+    }
+
+    pthread_mutex_lock( &cameraLock );
     myVideoCapture.read( mySource );
+    myNewFrameReady = true;
+    pthread_mutex_unlock( &cameraLock );
+}
+
+bool LineDetector::newFrameReady()
+{
+    return myNewFrameReady;
 }
 
 bool LineDetector::isFrameEmpty()
@@ -143,3 +238,26 @@ int LineDetector::getFrameHeight()
 {
     return myVideoCapture.get( CAP_PROP_FRAME_HEIGHT );
 }
+
+
+void LineDetector::shutdown()
+{
+    thread->shutdown();
+}
+bool LineDetector::isAlive()
+{
+    return alive;
+}
+bool LineDetector::isThreadAlive()
+{
+    return thread->isThreadAlive();
+}
+pthread_t LineDetector::getThreadId()
+{
+    return thread->getThreadId();
+}
+sem_t* LineDetector::getSemaphore()
+{
+    return &sem;
+}
+
