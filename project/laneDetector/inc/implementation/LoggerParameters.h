@@ -10,7 +10,7 @@
 #endif
 
 #ifndef LOGGER_PREFIX_LEVEL
-#define LOGGER_PREFIX_LEVEL   4 // Production
+#define LOGGER_PREFIX_LEVEL   3 // Debug
 #endif
 
 #ifndef LOGGER_ENABLE_COLORS

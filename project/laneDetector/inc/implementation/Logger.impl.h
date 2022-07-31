@@ -174,7 +174,7 @@ namespace {
   }
 
   // C-tor D-tor
-  Logger::Logger(const LogLevel &logLevel_, char const *fileName_, const int &lineNumber_) {
+  Logger::Logger(const LogLevel &logLevel_, char const *fileName_, char const * prettyFunction_, const int &lineNumber_) {
 
     setupStreamBufferSupervisor(); // hook the stream buffer to an object we can handle
     if (logLevel_ != _currentLogLevel_) _isNewLine_ = true; // force reprinting the prefix if the verbosity has changed
@@ -185,6 +185,7 @@ namespace {
     // static members
     _currentLogLevel_ = logLevel_;
     _currentFileName_ = fileName_;
+    _currentPrettyFunction_ = prettyFunction_;
     _currentLineNumber_ = lineNumber_;
   }
   Logger::~Logger() {
@@ -248,7 +249,9 @@ namespace {
       if(_enableColors_) strBuffer += "\x1b[90m"; // grey
       strBuffer += _currentFileName_;
       strBuffer += ":";
-      strBuffer += std::to_string(_currentLineNumber_);
+      strBuffer += _currentPrettyFunction_;
+      strBuffer += ":";
+      strBuffer += std::to_string( _currentLineNumber_ );
       if(_enableColors_) strBuffer += "\033[0m";
     }
     LoggerUtils::replaceSubstringInsideInputString(_currentPrefix_, "{FILELINE}", strBuffer);
@@ -475,6 +478,7 @@ namespace {
   std::string Logger::_currentPrefix_;
   Logger::LogLevel Logger::_currentLogLevel_{Logger::LogLevel::TRACE};
   std::string Logger::_currentFileName_;
+  std::string Logger::_currentPrettyFunction_;
   int Logger::_currentLineNumber_{-1};
   bool Logger::_isNewLine_{true};
   std::mutex Logger::_loggerMutex_;

@@ -21,13 +21,13 @@
 #define GET_OVERLOADED_MACRO3(_1,_2,_3,NAME,...) NAME
 
 // Here is what you want to use
-#define LogFatal       (Logger{Logger::LogLevel::FATAL,    FILENAME, __LINE__})
-#define LogError       (Logger{Logger::LogLevel::ERROR,    FILENAME, __LINE__})
-#define LogAlert       (Logger{Logger::LogLevel::ALERT,    FILENAME, __LINE__})
-#define LogWarning     (Logger{Logger::LogLevel::WARNING,  FILENAME, __LINE__})
-#define LogInfo        (Logger{Logger::LogLevel::INFO,     FILENAME, __LINE__})
-#define LogDebug       (Logger{Logger::LogLevel::DEBUG,    FILENAME, __LINE__})
-#define LogTrace       (Logger{Logger::LogLevel::TRACE,    FILENAME, __LINE__})
+#define LogFatal       (Logger{Logger::LogLevel::FATAL,    FILENAME, __FUNCTION__, __LINE__})
+#define LogError       (Logger{Logger::LogLevel::ERROR,    FILENAME, __FUNCTION__, __LINE__})
+#define LogAlert       (Logger{Logger::LogLevel::ALERT,    FILENAME, __FUNCTION__, __LINE__})
+#define LogWarning     (Logger{Logger::LogLevel::WARNING,  FILENAME, __FUNCTION__, __LINE__})
+#define LogInfo        (Logger{Logger::LogLevel::INFO,     FILENAME, __FUNCTION__, __LINE__})
+#define LogDebug       (Logger{Logger::LogLevel::DEBUG,    FILENAME, __FUNCTION__, __LINE__})
+#define LogTrace       (Logger{Logger::LogLevel::TRACE,    FILENAME, __FUNCTION__, __LINE__})
 
 // To make assertions
 #define LogThrowIf2(isThrowing_, errorMessage_)  if(isThrowing_){(LogError << "(" << __PRETTY_FUNCTION__ << "): "<< errorMessage_ << std::endl).throwError(#isThrowing_);}
@@ -114,7 +114,7 @@ namespace {
 
     // Macro-Related Methods
     // Those intended to be called using the above preprocessor macros
-    Logger(const LogLevel &logLevel_, char const * fileName_, const int &lineNumber_);
+    Logger(const LogLevel &logLevel_, char const * fileName_, char const * prettyFunction_, const int &lineNumber_);
     virtual ~Logger();
 
     static void throwError(const std::string& errorStr_ = "");
@@ -152,6 +152,7 @@ namespace {
     // internal
     static LogLevel _currentLogLevel_;
     static std::string _currentFileName_;
+    static std::string _currentPrettyFunction_;
     static int _currentLineNumber_;
     static std::string _currentPrefix_;
     static bool _isNewLine_;
