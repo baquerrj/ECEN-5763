@@ -13,9 +13,8 @@
 #include <fcntl.h>
 #include "unistd.h"
 
-pthread_t threads[ 4 ];
-
 pthread_mutex_t cameraLock;
+pthread_mutex_t imageLock;
 pthread_mutex_t ringLock;
 
 bool abortS1;
@@ -129,8 +128,9 @@ int main( int argc, char** argv )
         LogInfo( "Using %s as source", videoInput.c_str() );
     }
     pthread_mutex_init( &cameraLock, NULL );
+    pthread_mutex_init( &imageLock, NULL );
 
-    LineDetector* p_detector = new LineDetector( captureThreadConfig,
+    LineDetector* p_detector = new LineDetector( threadConfigurations,
                                                  LineDetector::DEFAULT_DEVICE_ID,
                                                  videoInput,
                                                  doStore,
@@ -175,8 +175,8 @@ int main( int argc, char** argv )
         {
             break;
         }
-        p_detector->prepareImage();
-        p_detector->detectLanes();
+        // p_detector->prepareImage();
+        // p_detector->detectLanes();
         p_detector->detectCars();
 
         framesProcessed++;
@@ -184,7 +184,7 @@ int main( int argc, char** argv )
         if( show )
         {
             p_detector->showLanesImage();
-            p_detector->showVehiclesImage();
+            // p_detector->showVehiclesImage();
             p_detector->showSourceImage();
         }
         else
@@ -213,11 +213,17 @@ int main( int argc, char** argv )
 
     if( p_detector )
     {
-        if( p_detector->isAlive() and p_detector->isThreadAlive() )
+        if( p_detector->isAlive() )
         {
-            p_detector->shutdown();
-
+            abortS1 = true;
+            abortS2 = true;
+            while( p_detector->isAlive() )
+            {
+                // loop here until all threads shut down
+                continue;
+            }
             delete p_detector;
+            p_detector = NULL;
         }
     }
     sem_close( semS1 );
@@ -232,9 +238,8 @@ int main( int argc, char** argv )
 
     pthread_mutex_unlock( &cameraLock );
     pthread_mutex_destroy( &cameraLock );
-
-    pthread_join( threads[ 0 ], ( void** )0 );
-
+    pthread_mutex_unlock( &imageLock );
+    pthread_mutex_destroy( &imageLock );
 
     return 0;
 }

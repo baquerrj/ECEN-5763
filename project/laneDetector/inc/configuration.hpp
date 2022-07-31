@@ -29,11 +29,10 @@ const int CPU_CAPTURE = CPU_MAIN;
 const int CPU_LANE_DETECTION = 1;
 const int CPU_CAR_DETECTION = 2;
 const int CPU_SIGN_DETECTION = 3;
-const int CPU_LOGGER = 0;
 
 static const ProcessParams captureParams = {
     cpuCapture,
-    SCHED_FIFO,
+    SCHED_RR,
     99,
     0};
 
@@ -44,7 +43,7 @@ static const ThreadConfigData captureThreadConfig = {
 
 static const ProcessParams laneDetectionParams = {
     cpuLaneDetection,
-    SCHED_FIFO,
+    SCHED_RR,
     98,
     0};
 
@@ -55,7 +54,7 @@ static const ThreadConfigData laneDetectionThreadConfig = {
 
 static const ProcessParams carDetectionParams = {
     cpuCarDetection,  // CPU1
-    SCHED_FIFO,
+    SCHED_RR,
     98,  // highest priority
     0};
 
@@ -66,7 +65,7 @@ static const ThreadConfigData carDetectionThreadConfig = {
 
 static const ProcessParams signDetectionParams = {
     cpuSignDetection,
-    SCHED_FIFO,
+    SCHED_RR,
     98,
     0};
 
@@ -75,16 +74,12 @@ static const ThreadConfigData signDetectionThreadConfig = {
     "signDetection",
     signDetectionParams};
 
-static const ProcessParams loggerParams = {
-    cpuLogger,
-    SCHED_FIFO,
-    1,  // low priority thread
-    0};
-
-static const ThreadConfigData loggerThreadConfig = {
-    true,
-    "logger",
-    loggerParams};
+static const ThreadConfigData threadConfigurations[ 4 ] ={
+    captureThreadConfig,
+    laneDetectionThreadConfig,
+    carDetectionThreadConfig,
+    signDetectionThreadConfig
+};
 
 extern bool abortS1;
 extern bool abortS2;

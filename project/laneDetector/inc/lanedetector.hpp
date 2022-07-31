@@ -40,7 +40,7 @@ class LineDetector
     static const bool DEFAULT_USE_CAMERA = false;
 
     public:
-    LineDetector( const ThreadConfigData configData,
+    LineDetector( const ThreadConfigData* configData,
                   int deviceId,
                   const String videoFilename = "",
                   bool writeOutputVideo = false,
@@ -87,17 +87,24 @@ class LineDetector
     void writeFrameToVideo();
 
     bool newFrameReady();
+
     virtual void shutdown();
+
     virtual bool isAlive();
-    virtual bool isThreadAlive();
-    virtual pthread_t getThreadId();
-    virtual sem_t* getSemaphore();
+
+    virtual bool isCaptureThreadAlive();
+    virtual bool isLineThreadAlive();
+
+    virtual pthread_t getCaptureThreadId();
+
+    virtual sem_t* getCaptureSemaphore();
 
     bool createdOk() {
         return myCreatedOk;
     }
 
-    static void* execute( void* context );
+    static void* executeCapture( void* context );
+    static void* executeLine( void* context );
 
 
     private:
@@ -125,11 +132,26 @@ class LineDetector
     CascadeClassifier myClassifier;
 
     protected:
-    std::string name;
-    bool alive;
-    sem_t sem;
-    CyclicThread* thread;
+    // Capture Thread
+    // ThreadConfigData captureConfig;
+    std::string captureThreadName;
+    bool captureThreadAlive;
+    sem_t captureThreadSem;
+    CyclicThread* captureThread;
 
+    // Line Detection Thread
+    // ThreadConfigData lineConfig;
+    std::string lineDetectionThreadName;
+    bool lineDetectionThreadAlive;
+    sem_t lineDetectionThreadSem;
+    CyclicThread* lineDetectionThread;
+
+    // Car Detection Thread
+    // ThreadConfigData carCondig;
+    std::string carDetectionThreadName;
+    bool carDetectionThreadAlive;
+    sem_t carDetectionThreadSem;
+    CyclicThread* carDetectionThread;
 };
 
 

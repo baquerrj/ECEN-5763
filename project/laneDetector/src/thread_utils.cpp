@@ -59,7 +59,6 @@ int cpuCapture = CPU_CAPTURE;
 int cpuLaneDetection = CPU_LANE_DETECTION;
 int cpuSignDetection = CPU_SIGN_DETECTION;
 int cpuCarDetection = CPU_CAR_DETECTION;
-int cpuLogger = CPU_LOGGER;
 
 
 static bool name_is_valid( const std::string name );

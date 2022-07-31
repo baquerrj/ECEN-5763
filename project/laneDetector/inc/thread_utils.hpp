@@ -13,7 +13,6 @@ extern int cpuLaneDetection;
 extern int cpuSignDetection;
 extern int cpuReceiver;
 extern int cpuCarDetection;
-extern int cpuLogger;
 
 extern const uint16_t MAX_THREADNAME_LENGTH;
 

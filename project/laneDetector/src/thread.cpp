@@ -14,6 +14,7 @@ CyclicThread::CyclicThread( const ThreadConfigData& configData,
 {
     threadData = configData;
     threadIsAlive = false;
+    name = configData.threadName;
 
     if( readyForThread )
     {
@@ -41,7 +42,7 @@ void CyclicThread::setFunctionAndOwner( void* ( *execute_ )( void* context ),
 
 void CyclicThread::initiateThread()
 {
-    LogDebug( "Entered" );
+    log( "Entered" );
     threadIsAlive = true;
     try
     {
@@ -61,14 +62,14 @@ void CyclicThread::initiateThread()
         LogFatal( "Caught exception: %s.", e.what() );
         threadIsAlive = false;
     }
-    LogDebug( "Exiting" );
+    log( "Exiting" );
 }
 
 void CyclicThread::terminate()
 {
-    LogDebug( "Entered" );
+    log( "Entered" );
     cancel_and_join_thread( thread, threadIsAlive );
-    LogDebug( "Exiting" );
+    log( "Exiting" );
 }
 
 void* CyclicThread::cycle()
@@ -78,7 +79,6 @@ void* CyclicThread::cycle()
         execute( owner );
     }
     LogInfo( "thread shutting down: %s", threadData.threadName.c_str() );
-    // pthread_join( thread, NULL );
     pthread_exit( NULL );
     return NULL;
 }
