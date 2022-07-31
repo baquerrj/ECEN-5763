@@ -21,10 +21,10 @@ class RingBuffer
         buffer( std::unique_ptr< T[] >( new T[ maxSize ] ) ), maxSize( maxSize )
     { assert( maxSize > 1 && buffer != nullptr ); }
 
-    ~RingBuffer< T >()
-    {
-        delete buffer;
-    }
+    // ~RingBuffer< T >()
+    // {
+    //     delete buffer;
+    // }
 
     //! @brief Add an item to this ring buffer
     //! @param item
