@@ -93,6 +93,10 @@ class LineDetector
     virtual pthread_t getThreadId();
     virtual sem_t* getSemaphore();
 
+    bool createdOk() {
+        return myCreatedOk;
+    }
+
     static void* execute( void* context );
 
 
@@ -104,6 +108,7 @@ class LineDetector
     int myMinLineLength;
     int myMaxLineGap;
     bool myNewFrameReady;
+    bool myCreatedOk;
 
     Mat tmp;
     Mat myLanesImage;

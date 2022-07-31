@@ -19,7 +19,7 @@ DEPENDENCIES \
 
 all: build $(APP_DIR)/$(TARGET)
 
-debug: CXXFLAGS += -O0 -g
+debug: CXXFLAGS += -O0 -g -D LOGGER_PREFIX_LEVEL=4
 debug: all
 
 release: CXXFLAGS += -O2

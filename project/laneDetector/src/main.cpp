@@ -3,7 +3,8 @@
 #include "thread_utils.hpp"
 #include "thread.hpp"
 #include "configuration.hpp"
-#include "logging.hpp"
+
+#include "Logger.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -26,10 +27,6 @@ sem_t* semS1;
 sem_t* semS2;
 sem_t* semS3;
 sem_t* semS4;
-
-logging::config_s logConfig = {
-    logging::LogLevel::ERROR, "main.log"
-};
 
 static void createSemaphoresAndMutexes()
 {
@@ -121,22 +118,15 @@ int main( int argc, char** argv )
     String store = p_parser->get<String>( "store" );
     String videoInput = p_parser->get<String>( "@input" );
 
-    pid_t mainThreadId = getpid();
-    std::string fileName = "server" + std::to_string( mainThreadId ) + ".log";
-    logConfig.file = fileName;
-    logConfig.cutoff = logging::LogLevel::TRACE;
-
-    logging::configure( logConfig );
-    logging::INFO( "Hello World!" );
     if( videoInput.empty() )
     {
-        logging::ERROR( "Missing path to test video!" );
+        LogFatal( "Missing path to test video!" );
         printHelp( p_parser );
         exit( -1 );
     }
     else
     {
-        logging::INFO( "Using " + videoInput + " as source" );
+        LogInfo( "Using %s as source", videoInput.c_str() );
     }
     pthread_mutex_init( &cameraLock, NULL );
 
@@ -149,13 +139,17 @@ int main( int argc, char** argv )
 
     if( p_detector == NULL )
     {
-        logging::ERROR( "Detector creation failed!" );
+        LogFatal( "Detector creation failed!" );
         exit( -1 );
     }
-
+    if( not p_detector->createdOk() )
+    {
+        delete p_detector;
+        exit( -1 );
+    }
     if( not p_detector->loadClassifier( LineDetector::CAR_CLASSIFIER ) )
     {
-        logging::ERROR( "Unable to load Haar classifier!" );
+        LogFatal( "Unable to load Haar classifier!" );
         delete p_detector;
         exit( -1 );
     }
@@ -166,7 +160,7 @@ int main( int argc, char** argv )
     struct timespec start = { 0, 0 };
     struct timespec stop = { 0, 0 };
 
-    logging::INFO( "Creating semaphores and mutexes!" );
+    LogInfo( "Creating semaphores and mutexes!" );
     createSemaphoresAndMutexes();
     clock_gettime( CLOCK_REALTIME, &start );
 

@@ -1,78 +1,89 @@
-#include <logging.hpp>
+#include "Logger.h"
 #include <pthread.h>
 #include <thread.hpp>
-
+#include "Logger.h"
 ThreadBase::~ThreadBase()
-{
-}
+{}
 
-CyclicThread::CyclicThread( const ThreadConfigData &configData,
-                            void *( *execute_ )( void *context ),
-                            void *owner_,
+CyclicThread::CyclicThread( const ThreadConfigData& configData,
+                            void* ( *execute_ )( void* context ),
+                            void* owner_,
                             bool readyForThread ) :
     execute( execute_ ),
     owner( owner_ )
 {
-   threadData    = configData;
-   threadIsAlive = false;
+    threadData = configData;
+    threadIsAlive = false;
 
-   if ( readyForThread )
-   {
-      initiateThread();
-   }
+    if( readyForThread )
+    {
+        initiateThread();
+    }
 }
 
-CyclicThread::CyclicThread( const ThreadConfigData &configData ) :
+CyclicThread::CyclicThread( const ThreadConfigData& configData ) :
     CyclicThread( configData, NULL, NULL, false )
-{
-}
+{}
 
 CyclicThread::~CyclicThread()
 {
-   terminate();
+    LogDebug( "Entered" );
+    terminate();
+    LogDebug( "Exiting" );
 }
 
-void CyclicThread::setFunctionAndOwner( void *( *execute_ )( void *context ),
-                                        void *owner_ )
+void CyclicThread::setFunctionAndOwner( void* ( *execute_ )( void* context ),
+                                        void* owner_ )
 {
-   owner   = owner_;
-   execute = execute_;
+    owner = owner_;
+    execute = execute_;
 }
 
 void CyclicThread::initiateThread()
 {
-   threadIsAlive = true;
-   try {
-    create_thread( threadData.threadName,
-                  thread,
-                  CyclicThread::threadFunction,
-                  this,
-                  threadData.processParams );
-   } catch ( std::exception e ) {
-    printf( "Exception: %s", e.what() );
-   }
+    LogDebug( "Entered" );
+    threadIsAlive = true;
+    try
+    {
+        create_thread( threadData.threadName,
+                       thread,
+                       CyclicThread::threadFunction,
+                       this,
+                       threadData.processParams );
+    }
+    catch( const std::string& e )
+    {
+        LogFatal( "Caught exception: %s.", e.c_str() );
+        threadIsAlive = false;
+    }
+    catch( const std::exception& e )
+    {
+        LogFatal( "Caught exception: %s.", e.what() );
+        threadIsAlive = false;
+    }
+    LogDebug( "Exiting" );
 }
 
 void CyclicThread::terminate()
 {
-   logging::INFO( "CyclicThread::terminate() entered", true );
-   cancel_and_join_thread( thread, threadIsAlive );
-   logging::INFO( "CyclicThread::terminate() exiting", true );
+    LogDebug( "Entered" );
+    cancel_and_join_thread( thread, threadIsAlive );
+    LogDebug( "Exiting" );
 }
 
-void *CyclicThread::cycle()
+void* CyclicThread::cycle()
 {
-   while ( threadIsAlive )
-   {
-      execute( owner );
-   }
-   logging::INFO( std::string( "thread shutting down: " + threadData.threadName ), true );
-   // pthread_join( thread, NULL );
-   pthread_exit( NULL );
-   return NULL;
+    while( threadIsAlive )
+    {
+        execute( owner );
+    }
+    LogInfo( "thread shutting down: %s", threadData.threadName.c_str() );
+    // pthread_join( thread, NULL );
+    pthread_exit( NULL );
+    return NULL;
 }
 
-void *CyclicThread::threadFunction( void *context )
+void* CyclicThread::threadFunction( void* context )
 {
-   return ( (CyclicThread *)context )->cycle();
+    return ( ( CyclicThread* )context )->cycle();
 }

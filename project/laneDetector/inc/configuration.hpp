@@ -3,9 +3,9 @@
 
 #include <thread_utils.hpp>
 #include <semaphore.h>
+#include "Logger.h"
 
 //! @file Defines thread and process configuration stuff
-
 
 #define SEMS1_NAME "/SEMS1"
 #define SEMS2_NAME "/SEMS2"

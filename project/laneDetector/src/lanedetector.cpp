@@ -7,9 +7,10 @@
 #include "configuration.hpp"
 #include "thread.hpp"
 #include "thread_utils.hpp"
-#include "logging.hpp"
 #include "string.h"
 using namespace std;
+
+#include "Logger.h"
 
 extern pthread_mutex_t cameraLock;
 
@@ -26,6 +27,7 @@ LineDetector::LineDetector( const ThreadConfigData configData,
                   int frameWidth,
                   int frameHeight )
 {
+    myCreatedOk = true;
     myFrameHeight = frameHeight;
     myFrameWidth = frameWidth;
     myDeviceId = deviceId;
@@ -63,8 +65,13 @@ LineDetector::LineDetector( const ThreadConfigData configData,
                                 true );
     if( NULL == thread )
     {
-        logging::ERROR( "Could not allocated memory for " + configData.threadName );
-        exit( -1 );
+        LogError( "Could not allocated memory for %s", configData.threadName.c_str() );
+        myCreatedOk = false;
+    }
+    if( not thread->isThreadAlive() )
+    {
+        LogError( "Could not start thread for %s", configData.threadName.c_str() );
+        myCreatedOk = false;
     }
 }
 
