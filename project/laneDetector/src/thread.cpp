@@ -42,7 +42,7 @@ void CyclicThread::setFunctionAndOwner( void* ( *execute_ )( void* context ),
 
 void CyclicThread::initiateThread()
 {
-    log( "Entered" );
+    LogDebug( "Entered" );
     threadIsAlive = true;
     try
     {
@@ -62,14 +62,14 @@ void CyclicThread::initiateThread()
         LogFatal( "Caught exception: %s.", e.what() );
         threadIsAlive = false;
     }
-    log( "Exiting" );
+    LogDebug( "Exiting" );
 }
 
 void CyclicThread::terminate()
 {
-    log( "Entered" );
+    LogDebug( "Entered" );
     cancel_and_join_thread( thread, threadIsAlive );
-    log( "Exiting" );
+    LogDebug( "Exiting" );
 }
 
 void* CyclicThread::cycle()

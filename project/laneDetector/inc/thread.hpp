@@ -45,10 +45,6 @@ class CyclicThread : public ThreadBase
         return name.c_str();
     }
 
-    inline void log( const std::string& message )
-    {
-        LogDebug( "%s: %s", name.c_str(), message.c_str() );
-    }
     protected:
     void* ( *execute )( void* context );
     virtual void* cycle();

@@ -12,6 +12,7 @@ static const int min_maxlinegap = 50;
 using namespace cv;
 
 #include <semaphore.h>
+#include "RingBuffer.h"
 
 class CyclicThread;
 struct ThreadConfigData;
@@ -118,6 +119,7 @@ class LineDetector
     bool myCreatedOk;
 
     Mat tmp;
+    Mat mySourceCopy;
     Mat myLanesImage;
     Mat myVehiclesImage;
     Mat myCannyOutput;
@@ -130,6 +132,8 @@ class LineDetector
     String myOutputVideoFilename;
 
     CascadeClassifier myClassifier;
+
+    RingBuffer< Mat > * p_myRawBuffer;
 
     protected:
     // Capture Thread

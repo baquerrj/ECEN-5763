@@ -11,7 +11,7 @@
 using namespace std;
 
 #include "Logger.h"
-
+#include "RingBuffer.h"
 extern pthread_mutex_t cameraLock;
 extern pthread_mutex_t imageLock;
 
@@ -44,6 +44,8 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     myVideoCapture.set( CAP_PROP_FRAME_WIDTH, ( double )frameWidth );
 
     createWindows();
+
+    p_myRawBuffer = new RingBuffer< Mat >( 25 );
 
     if( writeOutputVideo )
     {
@@ -118,6 +120,12 @@ LineDetector::~LineDetector()
         delete lineDetectionThread;
         lineDetectionThread = NULL;
     }
+
+    if( p_myRawBuffer )
+    {
+        delete p_myRawBuffer;
+        p_myRawBuffer = NULL;
+    }
 }
 
 void* LineDetector::executeCapture( void* context )
@@ -136,10 +144,19 @@ void LineDetector::readFrame()
     }
     myNewFrameReady = false;
     pthread_mutex_lock( &cameraLock );
-    myVideoCapture.read( mySource );
-    myNewFrameReady = true;
-    pthread_mutex_unlock( &cameraLock );
-    LogDebug( "New image ready!" );
+    if( p_myRawBuffer->isFull() )
+    {
+        myNewFrameReady = false;
+        pthread_mutex_unlock( &cameraLock );
+    }
+    else
+    {
+        myVideoCapture.read( mySource );
+        p_myRawBuffer->enqueue( mySource );
+        pthread_mutex_unlock( &cameraLock );
+        myNewFrameReady = true;
+        LogDebug( "New image ready!" );
+    }
 }
 
 void* LineDetector::executeLine( void* context )
@@ -150,12 +167,13 @@ void* LineDetector::executeLine( void* context )
 
 void LineDetector::prepareImage()
 {
-    if( newFrameReady() )
+    if( not p_myRawBuffer->isEmpty() )
     {
         pthread_mutex_lock( &cameraLock );
-        myLanesImage = mySource.clone();
-        cvtColor( mySource, myGrayscaleImage, COLOR_RGB2GRAY );
-        GaussianBlur( mySource, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
+        mySourceCopy = p_myRawBuffer->dequeue();
+        myLanesImage = mySourceCopy.clone();
+        cvtColor( mySourceCopy, myGrayscaleImage, COLOR_RGB2GRAY );
+        GaussianBlur( mySourceCopy, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
         pthread_mutex_unlock( &cameraLock );
         Canny( tmp, myCannyOutput, 40, 120, 3, true );
         // cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
