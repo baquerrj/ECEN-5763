@@ -147,12 +147,6 @@ int main( int argc, char** argv )
         delete p_detector;
         exit( -1 );
     }
-    if( not p_detector->loadClassifier( LineDetector::CAR_CLASSIFIER ) )
-    {
-        LogFatal( "Unable to load Haar classifier!" );
-        delete p_detector;
-        exit( -1 );
-    }
 
     char winInput;
 
@@ -177,7 +171,7 @@ int main( int argc, char** argv )
         }
         // p_detector->prepareImage();
         // p_detector->detectLanes();
-        p_detector->detectCars();
+        // p_detector->detectCars();
 
         framesProcessed++;
 
@@ -217,6 +211,7 @@ int main( int argc, char** argv )
         {
             abortS1 = true;
             abortS2 = true;
+            abortS3 = true;
             while( p_detector->isAlive() )
             {
                 // loop here until all threads shut down

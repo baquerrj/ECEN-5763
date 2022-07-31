@@ -65,12 +65,6 @@ class LineDetector
 
     void showVehiclesImage();
 
-    void setHoughLinesPThreshold( int value );
-
-    void setMinLineLength( int value );
-
-    void setMaxLineGap( int value );
-
     Mat getVehiclesImage();
 
     int getFrameRate();
@@ -95,6 +89,7 @@ class LineDetector
 
     virtual bool isCaptureThreadAlive();
     virtual bool isLineThreadAlive();
+    virtual bool isCarThreadAlive();
 
     virtual pthread_t getCaptureThreadId();
 
@@ -106,6 +101,7 @@ class LineDetector
 
     static void* executeCapture( void* context );
     static void* executeLine( void* context );
+    static void* executeCar( void* context );
 
 
     private:
@@ -158,5 +154,66 @@ class LineDetector
     CyclicThread* carDetectionThread;
 };
 
+
+inline bool LineDetector::isAlive()
+{
+    return ( isCaptureThreadAlive() || isLineThreadAlive() || isCarThreadAlive() );
+}
+
+inline sem_t* LineDetector::getCaptureSemaphore()
+{
+    return &captureThreadSem;
+}
+
+inline Mat LineDetector::getVehiclesImage()
+{
+    return myVehiclesImage;
+}
+
+inline int LineDetector::getFrameRate()
+{
+    return myVideoCapture.get( CAP_PROP_FPS );
+}
+
+inline int LineDetector::getFrameWidth()
+{
+    return myVideoCapture.get( CAP_PROP_FRAME_WIDTH );
+}
+
+inline int LineDetector::getFrameHeight()
+{
+    return myVideoCapture.get( CAP_PROP_FRAME_HEIGHT );
+}
+
+inline void LineDetector::showVehiclesImage()
+{
+    imshow( DETECTED_VEHICLES_IMAGE, myVehiclesImage );
+}
+
+inline bool LineDetector::newFrameReady()
+{
+    return myNewFrameReady;
+}
+
+inline bool LineDetector::isFrameEmpty()
+{
+    return mySource.empty();
+}
+
+inline void LineDetector::showSourceImage()
+{
+    if( not mySource.empty() )
+    {
+        imshow( SOURCE_WINDOW_NAME, mySource );
+    }
+}
+
+inline void LineDetector::showLanesImage()
+{
+    if( not myLanesImage.empty() )
+    {
+        imshow( DETECTED_LANES_IMAGE, myLanesImage );
+    }
+}
 
 #endif // __LANE_DETECTOR_HPP__

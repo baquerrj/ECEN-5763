@@ -12,7 +12,7 @@ using namespace std;
 
 #include "Logger.h"
 #include "RingBuffer.h"
-extern pthread_mutex_t cameraLock;
+extern pthread_mutex_t ringLock;
 extern pthread_mutex_t imageLock;
 
 const String LineDetector::SOURCE_WINDOW_NAME = "Source";
@@ -61,37 +61,68 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
                             true );
     }
 
-    myNewFrameReady = false;
-    ThreadConfigData captureConfig = configData[ 0 ];
-    captureThread = new CyclicThread( captureConfig,
-                                      LineDetector::executeCapture,
-                                      this,
-                                      true );
-    if( NULL == captureThread )
+
+    if( not loadClassifier( LineDetector::CAR_CLASSIFIER ) )
     {
-        LogError( "Could not allocated memory for %s", captureConfig.threadName.c_str() );
-        myCreatedOk = false;
-    }
-    if( not captureThread->isThreadAlive() )
-    {
-        LogError( "Could not start thread for %s", captureConfig.threadName.c_str() );
+        LogFatal( "Unable to load Haar classifier!" );
         myCreatedOk = false;
     }
 
-    ThreadConfigData lineConfig = configData[ 1 ];
-    lineDetectionThread = new CyclicThread( lineConfig,
-                                            LineDetector::executeLine,
-                                            this,
-                                            true );
-    if( NULL == lineDetectionThread )
+    if( myCreatedOk )
     {
-        LogError( "Could not allocated memory for %s", lineConfig.threadName.c_str() );
-        myCreatedOk = false;
-    }
-    if( not lineDetectionThread->isThreadAlive() )
-    {
-        LogError( "Could not start thread for %s", lineConfig.threadName.c_str() );
-        myCreatedOk = false;
+        myNewFrameReady = false;
+        ThreadConfigData captureConfig = configData[ 0 ];
+        captureThread = new CyclicThread( captureConfig,
+                                          LineDetector::executeCapture,
+                                          this,
+                                          true );
+        if( NULL == captureThread )
+        {
+            LogError( "Could not allocated memory for %s", captureConfig.threadName.c_str() );
+            myCreatedOk = false;
+        }
+        if( not captureThread->isThreadAlive() )
+        {
+            LogError( "Could not start thread for %s", captureConfig.threadName.c_str() );
+            myCreatedOk = false;
+        }
+
+        if( myCreatedOk )
+        {
+            ThreadConfigData lineConfig = configData[ 1 ];
+            lineDetectionThread = new CyclicThread( lineConfig,
+                                                    LineDetector::executeLine,
+                                                    this,
+                                                    true );
+            if( NULL == lineDetectionThread )
+            {
+                LogError( "Could not allocated memory for %s", lineConfig.threadName.c_str() );
+                myCreatedOk = false;
+            }
+            if( not lineDetectionThread->isThreadAlive() )
+            {
+                LogError( "Could not start thread for %s", lineConfig.threadName.c_str() );
+                myCreatedOk = false;
+            }
+            if( myCreatedOk )
+            {
+                ThreadConfigData carConfig = configData[ 2 ];
+                carDetectionThread = new CyclicThread( carConfig,
+                                                        LineDetector::executeCar,
+                                                        this,
+                                                        true );
+                if( NULL == carDetectionThread )
+                {
+                    LogError( "Could not allocated memory for %s", carConfig.threadName.c_str() );
+                    myCreatedOk = false;
+                }
+                if( not carDetectionThread->isThreadAlive() )
+                {
+                    LogError( "Could not start thread for %s", carConfig.threadName.c_str() );
+                    myCreatedOk = false;
+                }
+            }
+        }
     }
 }
 
@@ -121,6 +152,12 @@ LineDetector::~LineDetector()
         lineDetectionThread = NULL;
     }
 
+    if( carDetectionThread )
+    {
+        delete carDetectionThread;
+        carDetectionThread = NULL;
+    }
+
     if( p_myRawBuffer )
     {
         delete p_myRawBuffer;
@@ -143,17 +180,17 @@ void LineDetector::readFrame()
         return;
     }
     myNewFrameReady = false;
-    pthread_mutex_lock( &cameraLock );
+    pthread_mutex_lock( &ringLock );
     if( p_myRawBuffer->isFull() )
     {
         myNewFrameReady = false;
-        pthread_mutex_unlock( &cameraLock );
+        pthread_mutex_unlock( &ringLock );
     }
     else
     {
         myVideoCapture.read( mySource );
         p_myRawBuffer->enqueue( mySource );
-        pthread_mutex_unlock( &cameraLock );
+        pthread_mutex_unlock( &ringLock );
         myNewFrameReady = true;
         LogDebug( "New image ready!" );
     }
@@ -165,16 +202,22 @@ void* LineDetector::executeLine( void* context )
     return NULL;
 }
 
+void* LineDetector::executeCar( void* context )
+{
+    ( ( LineDetector* )context )->detectCars();
+    return NULL;
+}
+
 void LineDetector::prepareImage()
 {
     if( not p_myRawBuffer->isEmpty() )
     {
-        pthread_mutex_lock( &cameraLock );
+        pthread_mutex_lock( &ringLock );
         mySourceCopy = p_myRawBuffer->dequeue();
+        pthread_mutex_unlock( &ringLock );
         myLanesImage = mySourceCopy.clone();
         cvtColor( mySourceCopy, myGrayscaleImage, COLOR_RGB2GRAY );
         GaussianBlur( mySourceCopy, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
-        pthread_mutex_unlock( &cameraLock );
         Canny( tmp, myCannyOutput, 40, 120, 3, true );
         // cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
         // cvtColor( myCannyOutput, myVehiclesImage, COLOR_GRAY2RGB );
@@ -211,16 +254,25 @@ void LineDetector::detectLanes()
 
 void LineDetector::detectCars()
 {
-    vector<Rect> vehicle;
-    myClassifier.detectMultiScale( myGrayscaleImage, vehicle );
-
-    pthread_mutex_lock( &imageLock );
-    for( size_t i = 0; i < vehicle.size(); ++i )
+    if( abortS3 )
     {
-        rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+        LogDebug( "Aborting %s.", carDetectionThread->getName() );
+        carDetectionThread->shutdown();
+        return;
     }
-    pthread_mutex_unlock( &imageLock );
 
+    if( not myGrayscaleImage.empty() )
+    {
+        vector<Rect> vehicle;
+        myClassifier.detectMultiScale( myGrayscaleImage, vehicle );
+
+        pthread_mutex_lock( &imageLock );
+        for( size_t i = 0; i < vehicle.size(); ++i )
+        {
+            rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+        }
+        pthread_mutex_unlock( &imageLock );
+    }
 }
 
 bool LineDetector::loadClassifier( const String& classifier )
@@ -258,84 +310,12 @@ void LineDetector::createWindows()
 }
 
 
-
-bool LineDetector::newFrameReady()
-{
-    return myNewFrameReady;
-}
-
-bool LineDetector::isFrameEmpty()
-{
-    return mySource.empty();
-}
-
-void LineDetector::showSourceImage()
-{
-    if( not mySource.empty() )
-    {
-        imshow( SOURCE_WINDOW_NAME, mySource );
-    }
-}
-
-void LineDetector::showLanesImage()
-{
-    if( not myLanesImage.empty() )
-    {
-        imshow( DETECTED_LANES_IMAGE, myLanesImage );
-    }
-}
-
-void LineDetector::showVehiclesImage()
-{
-    imshow( DETECTED_VEHICLES_IMAGE, myVehiclesImage );
-}
-
-void LineDetector::setHoughLinesPThreshold( int value )
-{
-    myHoughLinesPThreshold = value;
-}
-
-void LineDetector::setMinLineLength( int value )
-{
-    myMinLineLength = value;
-}
-
-void LineDetector::setMaxLineGap( int value )
-{
-    myMaxLineGap = value;
-}
-
-Mat LineDetector::getVehiclesImage()
-{
-    return myVehiclesImage;
-}
-
-int LineDetector::getFrameRate()
-{
-    return myVideoCapture.get( CAP_PROP_FPS );
-}
-
-int LineDetector::getFrameWidth()
-{
-    return myVideoCapture.get( CAP_PROP_FRAME_WIDTH );
-}
-
-int LineDetector::getFrameHeight()
-{
-    return myVideoCapture.get( CAP_PROP_FRAME_HEIGHT );
-}
-
-
 void LineDetector::shutdown()
 {
     LogDebug( "Shutting down threads!" );
     captureThread->shutdown();
     lineDetectionThread->shutdown();
-}
-
-bool LineDetector::isAlive()
-{
-    return ( isCaptureThreadAlive() && isLineThreadAlive() );
+    carDetectionThread->shutdown();
 }
 
 bool LineDetector::isCaptureThreadAlive()
@@ -348,13 +328,12 @@ bool LineDetector::isLineThreadAlive()
     return lineDetectionThread->isThreadAlive();
 }
 
+bool LineDetector::isCarThreadAlive()
+{
+    return carDetectionThread->isThreadAlive();
+}
+
 pthread_t LineDetector::getCaptureThreadId()
 {
     return captureThread->getThreadId();
 }
-
-sem_t* LineDetector::getCaptureSemaphore()
-{
-    return &captureThreadSem;
-}
-
