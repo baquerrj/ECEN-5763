@@ -5,15 +5,13 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/objdetect.hpp"
 
-static const int min_threshold = 50;
-static const int min_linelength = 50;
-static const int min_maxlinegap = 50;
-
-using namespace cv;
 
 #include <semaphore.h>
 #include "RingBuffer.h"
 
+using namespace cv;
+
+// Forward declarartions
 class CyclicThread;
 struct ThreadConfigData;
 
