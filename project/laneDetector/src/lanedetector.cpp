@@ -8,11 +8,14 @@
 #include "thread.hpp"
 #include "thread_utils.hpp"
 #include "string.h"
+#include <unistd.h>
+
 using namespace std;
 
 #include "Logger.h"
 #include "RingBuffer.h"
-extern pthread_mutex_t ringLock;
+extern pthread_mutex_t rawBufferLock;
+extern pthread_mutex_t grayscaleBufferLock;
 extern pthread_mutex_t imageLock;
 
 const String LineDetector::SOURCE_WINDOW_NAME = "Source";
@@ -33,7 +36,7 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     myFrameWidth = frameWidth;
     myDeviceId = deviceId;
     myVideoFilename = videoFilename;
-
+    framesProcessed = 0;
     myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
     myMaxLineGap = INITIAL_MAX_LINE_LAP;
     myMinLineLength = INITIAL_MIN_LINE_LENGTH;
@@ -43,9 +46,18 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     myVideoCapture.set( CAP_PROP_FRAME_HEIGHT, ( double )frameHeight );
     myVideoCapture.set( CAP_PROP_FRAME_WIDTH, ( double )frameWidth );
 
+    roiPoints[ 0 ] = Point( 350, 430 ); // top left
+    roiPoints[ 1 ] = Point( 750, 430 ); // top right
+    roiPoints[ 2 ] = Point( 750, 567 ); // bottom right
+    roiPoints[ 3 ] = Point( 350, 567 ); // bottom left
+    foundLeft = false;
+    foundRight = false;
+
     createWindows();
 
-    p_myRawBuffer = new RingBuffer< Mat >( 25 );
+    p_myRawBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
+    p_myGrayscaleBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
+    p_myFinalBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
 
     if( writeOutputVideo )
     {
@@ -180,19 +192,30 @@ void LineDetector::readFrame()
         return;
     }
     myNewFrameReady = false;
-    pthread_mutex_lock( &ringLock );
+    pthread_mutex_lock( &rawBufferLock );
     if( p_myRawBuffer->isFull() )
     {
         myNewFrameReady = false;
-        pthread_mutex_unlock( &ringLock );
+        pthread_mutex_unlock( &rawBufferLock );
     }
     else
     {
-        myVideoCapture.read( mySource );
-        p_myRawBuffer->enqueue( mySource );
-        pthread_mutex_unlock( &ringLock );
+        myVideoCapture.read( tmp );
+        p_myRawBuffer->enqueue( tmp );
+        pthread_mutex_unlock( &rawBufferLock );
         myNewFrameReady = true;
-        LogDebug( "New image ready!" );
+        LogDebug( "New raw image ready!" );
+    }
+    // sleep 20 ms
+    usleep( 1000 * 20 );
+}
+
+void LineDetector::showLanesImage()
+{
+    if( not p_myFinalBuffer->isEmpty() )
+    {
+        LogDebug( "Updating final image on window!" );
+        imshow( DETECTED_LANES_IMAGE, p_myFinalBuffer->dequeue() );
     }
 }
 
@@ -208,48 +231,262 @@ void* LineDetector::executeCar( void* context )
     return NULL;
 }
 
-void LineDetector::prepareImage()
-{
-    if( not p_myRawBuffer->isEmpty() )
-    {
-        pthread_mutex_lock( &ringLock );
-        mySourceCopy = p_myRawBuffer->dequeue();
-        pthread_mutex_unlock( &ringLock );
-        myLanesImage = mySourceCopy.clone();
-        cvtColor( mySourceCopy, myGrayscaleImage, COLOR_RGB2GRAY );
-        GaussianBlur( mySourceCopy, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
-        Canny( tmp, myCannyOutput, 40, 120, 3, true );
-        // cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
-        // cvtColor( myCannyOutput, myVehiclesImage, COLOR_GRAY2RGB );
-    }
-    else
-    {
-        return;
-    }
-}
+// void LineDetector::prepareImage()
+// {
+//     if( not p_myRawBuffer->isEmpty() )
+//     {
+//         // pthread_mutex_lock( &rawBufferLock );
+//         // rawImage = p_myRawBuffer->dequeue();
+//         // pthread_mutex_unlock( &rawBufferLock );
+//         // myLanesImage = rawImage.clone();
+//         cvtColor( rawImage, myGrayscaleImage, COLOR_RGB2GRAY );
+//         GaussianBlur( rawImage, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
+//         Canny( tmp, imageToProcess, 40, 120, 3, true );
+//         pthread_mutex_lock( &grayscaleBufferLock );
+//         p_myGrayscaleBuffer->enqueue( imageToProcess );
+//         pthread_mutex_unlock( &grayscaleBufferLock );
+//         // cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
+//         // cvtColor( myCannyOutput, myVehiclesImage, COLOR_GRAY2RGB );
+//     }
+//     else
+//     {
+//         return;
+//     }
+// }
+#define RED    (Scalar( 96,  94, 211))
+#define BLUE   (Scalar(203, 147, 114))
 
 void LineDetector::detectLanes()
 {
+    LogTrace( "Entered" );
     if( abortS2 )
     {
         LogDebug( "Aborting %s.", lineDetectionThread->getName() );
         lineDetectionThread->shutdown();
         return;
     }
-    prepareImage();
 
-    // Probabilistic Line Transform
-    vector<Vec4i> linesP; // will hold the results of the detection
-    HoughLinesP( myCannyOutput, linesP, 1, CV_PI / 180, 70, 10, 50 ); // runs the actual detection
-    // Draw the lines
-    pthread_mutex_lock( &imageLock );
-    for( size_t i = 0; i < linesP.size(); i++ )
+    pthread_mutex_lock( &rawBufferLock );
+    if( not p_myRawBuffer->isEmpty() )
     {
-        Vec4i l = linesP[ i ];
-        line( myLanesImage, Point( l[ 0 ], l[ 1 ] ), Point( l[ 2 ], l[ 3 ] ), Scalar( 0, 0, 255 ), 3, LINE_AA );
+        rawImage = p_myRawBuffer->dequeue();
     }
-    pthread_mutex_unlock( &imageLock );
+    pthread_mutex_unlock( &rawBufferLock );
 
+    annot = Mat(rawImage);
+    cvtColor( rawImage, myGrayscaleImage, COLOR_BGR2GRAY );
+
+    // pthread_mutex_lock( &grayscaleBufferLock );
+    // if( not p_myGrayscaleBuffer->isFull() )
+    // {
+    //     p_myGrayscaleBuffer->enqueue( myGrayscaleImage );
+    // }
+    // pthread_mutex_unlock( &grayscaleBufferLock );
+
+    roi = myGrayscaleImage( Rect(roiPoints[0], roiPoints[2] ) );
+
+    medianBlur( roi, roi, 5 );
+
+    adaptiveThreshold( roi, roi, 255,
+    ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 5, -2 );
+
+    Vec4i left;
+    Vec4i right;
+
+    foundLeft = false;
+    foundRight = false;
+
+    findLeftLane(left);
+    findRightLane(right);
+
+    // pthread_mutex_lock( &imageLock );
+    // if( foundLeft and isInsideRoi( leftPt1 ) and isInsideRoi( leftPt2 ) )
+    if( foundLeft )
+    {
+        LogDebug( "Drawing detected left lane on image!" );
+        line(rawImage, leftPt1, leftPt2, Scalar(255, 0, 0), 3, LINE_4 );
+    }
+
+    // if( foundRight and isInsideRoi( rightPt1 ) and isInsideRoi( rightPt2 ) )
+    if( foundRight )
+    {
+        LogDebug( "Drawing detected right lane on image!" );
+        line(rawImage, rightPt1, rightPt2, Scalar(255, 0, 0), 3, LINE_4 );
+    }
+
+    LogDebug( "Drawing detected ROI on image!" );
+    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], Scalar( 255, 0, 0 ), 2, LINE_AA );
+    putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, Scalar( 255, 0, 0 ), 1.5 );
+
+    while( p_myFinalBuffer->isFull() and not abortS2 )
+    {
+        usleep( int(1000 * 2));
+        continue;
+    }
+    if( not abortS2 )
+    {
+        p_myFinalBuffer->enqueue( rawImage );
+        LogDebug( "New processed image ready!" );
+        framesProcessed++;
+    }
+    // pthread_mutex_unlock( &imageLock );
+    usleep( 1000 * 25 );
+    LogTrace( "Exiting" );
+}
+
+void LineDetector::findLeftLane( Vec4i left )
+{
+    vector< Vec3f > lines;
+    uint32_t i = 0;
+
+    HoughLines(
+        roi,
+        lines,
+        1,
+        CV_PI / 180,
+        30,
+        0,
+        0,
+        0.174533,
+        1.134464
+    );
+
+    while( !( foundLeft ) && i < lines.size() )
+    {
+
+        // sourced from OpenCV Hough tutorial:
+        float rho = lines[ i ][ 0 ], theta = lines[ i ][ 1 ];
+        if( abs( rho ) > 90 && abs( rho ) < 150 )
+        {
+            //LOGP("rho: %f, theta: %f, votes: %f\n", rho, theta*180/CV_PI, lines[i][2]);
+            double a = cos( theta ), b = sin( theta );
+            double x0 = a * rho, y0 = b * rho;
+            left[ 0 ] = cvRound( x0 + 1000 * ( -b ) );
+            left[ 1 ] = cvRound( y0 + 1000 * ( a ) );
+            left[ 2 ] = cvRound( x0 - 1000 * ( -b ) );
+            left[ 3 ] = cvRound( y0 - 1000 * ( a ) );
+            foundLeft = true;
+        }
+
+        i++;
+    }
+    if( foundLeft )
+    {
+        Point2f ret;
+        Point2f pt1 = Point2f( left[ 0 ], left[ 1 ] );
+        Point2f pt2 = Point2f( left[ 2 ], left[ 3 ] );
+
+        if( getIntersection( Point( 0, 0 ), Point( 1, 1 ), pt1, pt2, ret ) )
+        {
+            leftPt1 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
+        }
+        else
+        {
+            foundLeft = false;
+        }
+        if( getIntersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
+        {
+            leftPt2 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
+        }
+        else
+        {
+            foundLeft = false;
+        }
+    }
+}
+
+void LineDetector::findRightLane( Vec4i right )
+{
+
+    vector< Vec3f > lines;
+    uint32_t i = 0;
+    HoughLines(
+        roi,           // image
+        lines,         // lines
+        1,             // rho resolution of accumulator in pixels
+        CV_PI / 180,     // theta resolution of accumulator
+        30,    // accumulator threshold, only lines >threshold returned
+        0,             // srn - set to 0 for classical Hough
+        0,             // stn - set to 0 for classical Hough
+        2.007129,      // minimum theta
+        2.967060       // maximum theta
+    );
+
+
+    while( !( foundRight ) && i < lines.size() )
+    {
+
+        // sourced from OpenCV Hough tutorial:
+        float rho = lines[ i ][ 0 ], theta = lines[ i ][ 1 ];
+        if( abs( rho ) > 150 && abs( rho ) < 300 )
+        {
+            //LOGP("rho: %f, theta: %f, votes: %f\n", rho, theta*180/CV_PI, lines[i][2]);
+            double a = cos( theta ), b = sin( theta );
+            double x0 = a * rho, y0 = b * rho;
+            right[ 0 ] = cvRound( x0 + 1000 * ( -b ) );
+            right[ 1 ] = cvRound( y0 + 1000 * ( a ) );
+            right[ 2 ] = cvRound( x0 - 1000 * ( -b ) );
+            right[ 3 ] = cvRound( y0 - 1000 * ( a ) );
+            foundRight = true;
+        }
+
+        i++;
+    }
+
+
+
+    if( foundRight )
+    {
+
+        Point2f ret;
+        Point2f pt1 = Point2f( right[ 0 ], right[ 1 ] );
+        Point2f pt2 = Point2f( right[ 2 ], right[ 3 ] );
+
+        //
+        // check ROI top side intersection with lane line
+        //
+        if( getIntersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
+        {
+            rightPt1 = Point( ret ) + roiPoints[ 0 ];
+        }
+        else
+        {
+            foundRight = false;
+        }
+
+        //
+        // check ROI bottom side intersection with lane line
+        //
+        if( getIntersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
+        {
+            rightPt2 = Point( ret ) + roiPoints[ 0 ];
+        }
+        else
+        {
+            foundRight = false;
+        }
+    }
+
+}
+
+bool LineDetector::isInsideRoi( Point p )
+{
+    return ( 0 <= p.x and p.x < annot.cols and 0 <= p.y and p.y < annot.rows );
+}
+
+bool LineDetector::getIntersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f &r )
+{
+    Point2f x = o2 - o1;
+    Point2f d1 = p1 - o1;
+    Point2f d2 = p2 - o2;
+
+    float cross = d1.x * d2.y - d1.y * d2.x;
+    if( abs( cross ) < /*EPS*/1e-8 )
+        return false;
+
+    double t1 = ( x.x * d2.y - x.y * d2.x ) / cross;
+    r = o1 + d1 * t1;
+    return true;
 }
 
 void LineDetector::detectCars()
@@ -261,18 +498,22 @@ void LineDetector::detectCars()
         return;
     }
 
-    if( not myGrayscaleImage.empty() )
+    pthread_mutex_lock( &grayscaleBufferLock );
+    if( not p_myGrayscaleBuffer->isEmpty() )
     {
-        vector<Rect> vehicle;
-        myClassifier.detectMultiScale( myGrayscaleImage, vehicle );
-
-        pthread_mutex_lock( &imageLock );
-        for( size_t i = 0; i < vehicle.size(); ++i )
-        {
-            rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
-        }
-        pthread_mutex_unlock( &imageLock );
+        imageToProcess = p_myGrayscaleBuffer->dequeue();
     }
+    pthread_mutex_unlock( &grayscaleBufferLock );
+
+    vector<Rect> vehicle;
+    myClassifier.detectMultiScale( imageToProcess, vehicle );
+
+    pthread_mutex_lock( &imageLock );
+    for( size_t i = 0; i < vehicle.size(); ++i )
+    {
+        rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+    }
+    pthread_mutex_unlock( &imageLock );
 }
 
 bool LineDetector::loadClassifier( const String& classifier )
@@ -295,18 +536,17 @@ void LineDetector::writeFrameToVideo()
 
 void LineDetector::createWindows()
 {
-
-    namedWindow( SOURCE_WINDOW_NAME, WINDOW_NORMAL );
-    resizeWindow( SOURCE_WINDOW_NAME, Size( myFrameWidth, myFrameHeight ) );
-    LogInfo( "Created window: %s", SOURCE_WINDOW_NAME.c_str() );
+    // namedWindow( SOURCE_WINDOW_NAME, WINDOW_NORMAL );
+    // resizeWindow( SOURCE_WINDOW_NAME, Size( myFrameWidth, myFrameHeight ) );
+    // LogInfo( "Created window: %s", SOURCE_WINDOW_NAME.c_str() );
 
     namedWindow( DETECTED_LANES_IMAGE, WINDOW_NORMAL );
     resizeWindow( DETECTED_LANES_IMAGE, Size( myFrameWidth, myFrameHeight ) );
     LogInfo( "Created window: %s", DETECTED_LANES_IMAGE.c_str() );
 
-    namedWindow( DETECTED_VEHICLES_IMAGE, WINDOW_NORMAL );
-    resizeWindow( DETECTED_VEHICLES_IMAGE, Size( myFrameWidth, myFrameHeight ) );
-    LogInfo( "Created window: %s", DETECTED_VEHICLES_IMAGE.c_str() );
+    // namedWindow( DETECTED_VEHICLES_IMAGE, WINDOW_NORMAL );
+    // resizeWindow( DETECTED_VEHICLES_IMAGE, Size( myFrameWidth, myFrameHeight ) );
+    // LogInfo( "Created window: %s", DETECTED_VEHICLES_IMAGE.c_str() );
 }
 
 

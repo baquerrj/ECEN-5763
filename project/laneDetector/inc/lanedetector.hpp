@@ -24,6 +24,7 @@ class LineDetector
     static const String DETECTED_VEHICLES_IMAGE;
     static const String CAR_CLASSIFIER;
 
+    static const int RING_BUFFER_SIZE = 100;
     static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 20;
     static const int INITIAL_MIN_LINE_LENGTH = 10;
     static const int INITIAL_MAX_LINE_LAP = 1;
@@ -75,6 +76,11 @@ class LineDetector
 
     void detectLanes();
 
+    bool getIntersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f& r );
+
+    void findLeftLane( Vec4i left );
+    void findRightLane( Vec4i right );
+    bool isInsideRoi( Point p );
     void detectCars();
 
     void writeFrameToVideo();
@@ -97,13 +103,18 @@ class LineDetector
         return myCreatedOk;
     }
 
+    inline uint64_t getFramesProcessed()
+    {
+        return framesProcessed;
+    }
+
     static void* executeCapture( void* context );
     static void* executeLine( void* context );
     static void* executeCar( void* context );
 
 
     private:
-    Mat mySource;
+    Mat annot;
     VideoCapture myVideoCapture;
     VideoWriter myVideoWriter;
     int myHoughLinesPThreshold;
@@ -111,6 +122,9 @@ class LineDetector
     int myMaxLineGap;
     bool myNewFrameReady;
     bool myCreatedOk;
+
+    Mat rawImage;
+    Mat imageToProcess;
 
     Mat tmp;
     Mat mySourceCopy;
@@ -127,7 +141,22 @@ class LineDetector
 
     CascadeClassifier myClassifier;
 
-    RingBuffer< Mat > * p_myRawBuffer;
+    RingBuffer< Mat >* p_myRawBuffer;
+    RingBuffer< Mat >* p_myGrayscaleBuffer;
+    RingBuffer< Mat >* p_myFinalBuffer;
+
+    uint64_t framesProcessed;
+
+    Point roiPoints[ 4 ];
+    Mat roi;
+    Point leftPt1;
+    Point leftPt2;
+    Point rightPt1;
+    Point rightPt2;
+
+
+    bool foundLeft;
+    bool foundRight;
 
     protected:
     // Capture Thread
@@ -193,25 +222,25 @@ inline bool LineDetector::newFrameReady()
     return myNewFrameReady;
 }
 
-inline bool LineDetector::isFrameEmpty()
-{
-    return mySource.empty();
-}
+// inline bool LineDetector::isFrameEmpty()
+// {
+//     return mySource.empty();
+// }
 
-inline void LineDetector::showSourceImage()
-{
-    if( not mySource.empty() )
-    {
-        imshow( SOURCE_WINDOW_NAME, mySource );
-    }
-}
+// inline void LineDetector::showSourceImage()
+// {
+//     if( not mySource.empty() )
+//     {
+//         imshow( SOURCE_WINDOW_NAME, mySource );
+//     }
+// }
 
-inline void LineDetector::showLanesImage()
-{
-    if( not myLanesImage.empty() )
-    {
-        imshow( DETECTED_LANES_IMAGE, myLanesImage );
-    }
-}
+// inline void LineDetector::showLanesImage()
+// {
+//     if( not p_myFinalBuffer->isEmpty() )
+//     {
+//         imshow( DETECTED_LANES_IMAGE, p_myFinalBuffer->dequeue() );
+//     }
+// }
 
 #endif // __LANE_DETECTOR_HPP__

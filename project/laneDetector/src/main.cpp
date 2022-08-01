@@ -13,9 +13,9 @@
 #include <fcntl.h>
 #include "unistd.h"
 
-pthread_mutex_t cameraLock;
+pthread_mutex_t grayscaleBufferLock;
 pthread_mutex_t imageLock;
-pthread_mutex_t ringLock;
+pthread_mutex_t rawBufferLock;
 
 bool abortS1;
 bool abortS2;
@@ -29,7 +29,9 @@ sem_t* semS4;
 
 static void createSemaphoresAndMutexes()
 {
-    pthread_mutex_init( &ringLock, NULL );
+    pthread_mutex_init( &rawBufferLock, NULL );
+    pthread_mutex_init( &grayscaleBufferLock, NULL );
+    pthread_mutex_init( &imageLock, NULL );
 
     semS1 = sem_open( SEMS1_NAME, O_CREAT | O_EXCL, 0644, 0 );
     if( semS1 == SEM_FAILED )
@@ -127,16 +129,17 @@ int main( int argc, char** argv )
     {
         LogInfo( "Using %s as source", videoInput.c_str() );
     }
-    pthread_mutex_init( &cameraLock, NULL );
-    pthread_mutex_init( &imageLock, NULL );
+    // pthread_mutex_init( &grayscaleBufferLock, NULL );
+    // pthread_mutex_init( &imageLock, NULL );
 
+    createSemaphoresAndMutexes();
     LineDetector* p_detector = new LineDetector( threadConfigurations,
                                                  LineDetector::DEFAULT_DEVICE_ID,
                                                  videoInput,
                                                  doStore,
                                                  store );
 
-
+    abortS3 = true;
     if( p_detector == NULL )
     {
         LogFatal( "Detector creation failed!" );
@@ -155,36 +158,25 @@ int main( int argc, char** argv )
     struct timespec stop = { 0, 0 };
 
     LogInfo( "Creating semaphores and mutexes!" );
-    createSemaphoresAndMutexes();
     clock_gettime( CLOCK_REALTIME, &start );
 
     while( true )
     {
-        if( not p_detector->newFrameReady() )
-        {
-            continue;
-        }
+        // if( not p_detector->newFrameReady() )
+        // {
+        //     continue;
+        // }
 
-        if( p_detector->isFrameEmpty() )
-        {
-            break;
-        }
+        // if( p_detector->isFrameEmpty() )
+        // {
+        //     break;
+        // }
         // p_detector->prepareImage();
         // p_detector->detectLanes();
         // p_detector->detectCars();
 
-        framesProcessed++;
 
-        if( show )
-        {
             p_detector->showLanesImage();
-            // p_detector->showVehiclesImage();
-            p_detector->showSourceImage();
-        }
-        else
-        {
-            p_detector->showLanesImage();
-        }
 
         if( doStore )
         {
@@ -197,14 +189,6 @@ int main( int argc, char** argv )
             break;
         }
     }
-    clock_gettime( CLOCK_REALTIME, &stop );
-
-    double deltas = delta_t( &stop, &start );
-    double deltaTMS = deltas / framesProcessed;
-    double deltaT = deltaTMS / 1000.0;
-    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
-    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
-
     if( p_detector )
     {
         if( p_detector->isAlive() )
@@ -217,10 +201,22 @@ int main( int argc, char** argv )
                 // loop here until all threads shut down
                 continue;
             }
+            framesProcessed = p_detector->getFramesProcessed();
             delete p_detector;
             p_detector = NULL;
         }
     }
+
+
+    clock_gettime( CLOCK_REALTIME, &stop );
+    double deltas = delta_t( &stop, &start );
+    double deltaTMS = deltas / framesProcessed;
+    double deltaT = deltaTMS / 1000.0;
+
+
+    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+
     sem_close( semS1 );
     sem_close( semS2 );
     sem_close( semS3 );
@@ -231,8 +227,8 @@ int main( int argc, char** argv )
     sem_unlink( SEMS3_NAME );
     sem_unlink( SEMS4_NAME );
 
-    pthread_mutex_unlock( &cameraLock );
-    pthread_mutex_destroy( &cameraLock );
+    pthread_mutex_unlock( &grayscaleBufferLock );
+    pthread_mutex_destroy( &grayscaleBufferLock );
     pthread_mutex_unlock( &imageLock );
     pthread_mutex_destroy( &imageLock );
 
