@@ -151,7 +151,7 @@ int main( int argc, char** argv )
                                                  doStore,
                                                  store );
 
-    abortS3 = true;
+// abortS3 = true;
     abortS4 = true;
     if( p_detector == NULL )
     {

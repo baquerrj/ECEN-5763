@@ -76,7 +76,7 @@ class LineDetector
 
     void detectLanes();
 
-    bool getIntersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f& r );
+    bool intersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f& r );
 
     void findLeftLane( Vec4i left );
     void findRightLane( Vec4i right );

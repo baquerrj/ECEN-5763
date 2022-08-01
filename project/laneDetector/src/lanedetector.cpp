@@ -260,12 +260,12 @@ void LineDetector::detectLanes()
     annot = Mat(rawImage);
     cvtColor( rawImage, myGrayscaleImage, COLOR_BGR2GRAY );
 
-    // pthread_mutex_lock( &grayscaleBufferLock );
-    // if( not p_myGrayscaleBuffer->isFull() )
-    // {
-    //     p_myGrayscaleBuffer->enqueue( myGrayscaleImage );
-    // }
-    // pthread_mutex_unlock( &grayscaleBufferLock );
+    pthread_mutex_lock( &grayscaleBufferLock );
+    if( not p_myGrayscaleBuffer->isFull() )
+    {
+        p_myGrayscaleBuffer->enqueue( myGrayscaleImage );
+    }
+    pthread_mutex_unlock( &grayscaleBufferLock );
 
     roi = myGrayscaleImage( Rect(roiPoints[0], roiPoints[2] ) );
 
@@ -359,7 +359,7 @@ void LineDetector::findLeftLane( Vec4i left )
         Point2f pt1 = Point2f( left[ 0 ], left[ 1 ] );
         Point2f pt2 = Point2f( left[ 2 ], left[ 3 ] );
 
-        if( getIntersection( Point( 0, 0 ), Point( 1, 1 ), pt1, pt2, ret ) )
+        if( intersection( Point( 0, 0 ), Point( 1, 1 ), pt1, pt2, ret ) )
         {
             leftPt1 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
         }
@@ -367,7 +367,7 @@ void LineDetector::findLeftLane( Vec4i left )
         {
             foundLeft = false;
         }
-        if( getIntersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
+        if( intersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
             leftPt2 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
         }
@@ -425,7 +425,7 @@ void LineDetector::findRightLane( Vec4i right )
         Point2f pt1 = Point2f( right[ 0 ], right[ 1 ] );
         Point2f pt2 = Point2f( right[ 2 ], right[ 3 ] );
 
-        if( getIntersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
+        if( intersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
         {
             rightPt1 = Point( ret ) + roiPoints[ 0 ];
         }
@@ -434,7 +434,7 @@ void LineDetector::findRightLane( Vec4i right )
             foundRight = false;
         }
 
-        if( getIntersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
+        if( intersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
             rightPt2 = Point( ret ) + roiPoints[ 0 ];
         }
@@ -446,24 +446,27 @@ void LineDetector::findRightLane( Vec4i right )
 
 }
 
-bool LineDetector::isInsideRoi( Point p )
-{
-    return ( 0 <= p.x and p.x < annot.cols and 0 <= p.y and p.y < annot.rows );
-}
-
-bool LineDetector::getIntersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f &r )
+// Finds the intersection of two lines, or returns false.
+// The lines are defined by (o1, p1) and (o2, p2).
+// https://stackoverflow.com/questions/7446126/opencv-2d-line-intersection-helper-function
+bool LineDetector::intersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2,
+                   Point2f& r )
 {
     Point2f x = o2 - o1;
     Point2f d1 = p1 - o1;
     Point2f d2 = p2 - o2;
 
     float cross = d1.x * d2.y - d1.y * d2.x;
-    if( abs( cross ) < /*EPS*/1e-8 )
+    if( abs( cross ) < 1e-8 )
+    {
         return false;
-
-    double t1 = ( x.x * d2.y - x.y * d2.x ) / cross;
-    r = o1 + d1 * t1;
-    return true;
+    }
+    else
+    {
+        double t1 = ( x.x * d2.y - x.y * d2.x ) / cross;
+        r = o1 + d1 * t1;
+        return true;
+    }
 }
 
 void LineDetector::detectCars()
@@ -474,6 +477,8 @@ void LineDetector::detectCars()
         carDetectionThread->shutdown();
         return;
     }
+
+    sem_wait( semS3 );
 
     pthread_mutex_lock( &grayscaleBufferLock );
     if( not p_myGrayscaleBuffer->isEmpty() )
