@@ -5,6 +5,7 @@
 #include "configuration.hpp"
 
 #include "Logger.h"
+#include "Sequencer.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -21,6 +22,7 @@ bool abortS1;
 bool abortS2;
 bool abortS3;
 bool abortS4;
+bool abortSequencer;
 
 sem_t* semS1;
 sem_t* semS2;
@@ -81,15 +83,6 @@ static void createSemaphoresAndMutexes()
     }
 }
 
-double delta_t( struct timespec* stop, struct timespec* start )
-{
-    double current = ( ( double )stop->tv_sec * 1000.0 ) +
-        ( ( double )( ( double )stop->tv_nsec / 1000000.0 ) );
-    double last = ( ( double )start->tv_sec * 1000.0 ) +
-        ( ( double )( ( double )start->tv_nsec / 1000000.0 ) );
-    return ( current - last );
-}
-
 static const char* keys = {
     "{help          h|false|show help message}"
     "{@input         |./videos/22400003.AVI|path to test video to process}"
@@ -104,6 +97,12 @@ void printHelp( CommandLineParser* p_parser )
     p_parser->printMessage();
     printf( "Press the ESC key to exit the program.\n\r" );
 }
+
+#define USEC_PER_MSEC ( 1000 )
+#define SEC_TO_MSEC ( 1000 )
+#define NSEC_PER_SEC ( 1000000000 )
+#define NSEC_PER_USEC ( 1000000 )
+
 
 int main( int argc, char** argv )
 {
@@ -132,7 +131,20 @@ int main( int argc, char** argv )
     // pthread_mutex_init( &grayscaleBufferLock, NULL );
     // pthread_mutex_init( &imageLock, NULL );
 
+    uint8_t captureFrequency = 20;
+    double serviceDeadline = 1 / ( double )captureFrequency;
+    double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
+
     createSemaphoresAndMutexes();
+
+    Sequencer* p_sequencer = new Sequencer( captureFrequency );
+    if( p_sequencer == NULL )
+    {
+        LogFatal( "Sequencer creation failed!" );
+        exit( -1 );
+    }
+    p_sequencer->setDeadline( sequencerDeadline );
+
     LineDetector* p_detector = new LineDetector( threadConfigurations,
                                                  LineDetector::DEFAULT_DEVICE_ID,
                                                  videoInput,
@@ -140,6 +152,7 @@ int main( int argc, char** argv )
                                                  store );
 
     abortS3 = true;
+    abortS4 = true;
     if( p_detector == NULL )
     {
         LogFatal( "Detector creation failed!" );
@@ -162,21 +175,7 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        // if( not p_detector->newFrameReady() )
-        // {
-        //     continue;
-        // }
-
-        // if( p_detector->isFrameEmpty() )
-        // {
-        //     break;
-        // }
-        // p_detector->prepareImage();
-        // p_detector->detectLanes();
-        // p_detector->detectCars();
-
-
-            p_detector->showLanesImage();
+        p_detector->showLanesImage();
 
         if( doStore )
         {
@@ -189,6 +188,20 @@ int main( int argc, char** argv )
             break;
         }
     }
+
+    if( p_sequencer )
+    {
+        LogTrace( "Shutting down Sequencer..." );
+        abortSequencer = true;
+        while( p_sequencer->isAlive() )
+        {
+            LogTrace( "Waiting for Sequencer to abort..." );
+            continue;
+        }
+        delete p_sequencer;
+        p_sequencer = NULL;
+    }
+
     if( p_detector )
     {
         if( p_detector->isAlive() )

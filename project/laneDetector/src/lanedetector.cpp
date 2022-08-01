@@ -191,6 +191,7 @@ void LineDetector::readFrame()
         captureThread->shutdown();
         return;
     }
+    sem_wait( semS1 );
     myNewFrameReady = false;
     pthread_mutex_lock( &rawBufferLock );
     if( p_myRawBuffer->isFull() )
@@ -206,8 +207,6 @@ void LineDetector::readFrame()
         myNewFrameReady = true;
         LogDebug( "New raw image ready!" );
     }
-    // sleep 20 ms
-    usleep( 1000 * 20 );
 }
 
 void LineDetector::showLanesImage()
@@ -231,28 +230,6 @@ void* LineDetector::executeCar( void* context )
     return NULL;
 }
 
-// void LineDetector::prepareImage()
-// {
-//     if( not p_myRawBuffer->isEmpty() )
-//     {
-//         // pthread_mutex_lock( &rawBufferLock );
-//         // rawImage = p_myRawBuffer->dequeue();
-//         // pthread_mutex_unlock( &rawBufferLock );
-//         // myLanesImage = rawImage.clone();
-//         cvtColor( rawImage, myGrayscaleImage, COLOR_RGB2GRAY );
-//         GaussianBlur( rawImage, tmp, Size( 5, 5 ), 0, 0, BORDER_DEFAULT );
-//         Canny( tmp, imageToProcess, 40, 120, 3, true );
-//         pthread_mutex_lock( &grayscaleBufferLock );
-//         p_myGrayscaleBuffer->enqueue( imageToProcess );
-//         pthread_mutex_unlock( &grayscaleBufferLock );
-//         // cvtColor( myCannyOutput, myLanesImage, COLOR_GRAY2RGB );
-//         // cvtColor( myCannyOutput, myVehiclesImage, COLOR_GRAY2RGB );
-//     }
-//     else
-//     {
-//         return;
-//     }
-// }
 #define RED    (Scalar( 96,  94, 211))
 #define BLUE   (Scalar(203, 147, 114))
 
@@ -265,11 +242,18 @@ void LineDetector::detectLanes()
         lineDetectionThread->shutdown();
         return;
     }
+    sem_wait( semS2 );
 
     pthread_mutex_lock( &rawBufferLock );
     if( not p_myRawBuffer->isEmpty() )
     {
         rawImage = p_myRawBuffer->dequeue();
+    }
+    else
+    {
+        pthread_mutex_unlock( &rawBufferLock );
+        LogTrace( "Raw Buffer is empty! Looping around...");
+        return;
     }
     pthread_mutex_unlock( &rawBufferLock );
 
@@ -330,7 +314,6 @@ void LineDetector::detectLanes()
         framesProcessed++;
     }
     // pthread_mutex_unlock( &imageLock );
-    usleep( 1000 * 25 );
     LogTrace( "Exiting" );
 }
 
@@ -442,9 +425,6 @@ void LineDetector::findRightLane( Vec4i right )
         Point2f pt1 = Point2f( right[ 0 ], right[ 1 ] );
         Point2f pt2 = Point2f( right[ 2 ], right[ 3 ] );
 
-        //
-        // check ROI top side intersection with lane line
-        //
         if( getIntersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
         {
             rightPt1 = Point( ret ) + roiPoints[ 0 ];
@@ -454,9 +434,6 @@ void LineDetector::findRightLane( Vec4i right )
             foundRight = false;
         }
 
-        //
-        // check ROI bottom side intersection with lane line
-        //
         if( getIntersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
             rightPt2 = Point( ret ) + roiPoints[ 0 ];

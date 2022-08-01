@@ -8,6 +8,7 @@
 
 extern int numCpus;
 extern int cpuMain;
+extern int cpuSequencer;
 extern int cpuCapture;
 extern int cpuLaneDetection;
 extern int cpuSignDetection;

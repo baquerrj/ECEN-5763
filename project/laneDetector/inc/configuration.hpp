@@ -5,6 +5,24 @@
 #include <semaphore.h>
 #include "Logger.h"
 
+
+/**
+ * @brief calculates the difference between the start and stop times
+ *
+ * @param stop
+ * @param start
+ * @return double
+ */
+inline double delta_t( struct timespec* stop, struct timespec* start )
+{
+    double current = ( ( double )stop->tv_sec * 1000.0 ) +
+        ( ( double )( ( double )stop->tv_nsec / 1000000.0 ) );
+    double last = ( ( double )start->tv_sec * 1000.0 ) +
+        ( ( double )( ( double )start->tv_nsec / 1000000.0 ) );
+    return ( current - last );
+}
+
+
 //! @file Defines thread and process configuration stuff
 
 #define SEMS1_NAME "/SEMS1"
@@ -25,15 +43,27 @@ extern sem_t* semS4;
 const int NUM_CPUS = 4;  // number of CPU's on the target machine
 
 const int CPU_MAIN = 0;
+const int CPU_SEQUENCER = CPU_MAIN;
 const int CPU_CAPTURE = CPU_MAIN;
 const int CPU_LANE_DETECTION = 1;
 const int CPU_CAR_DETECTION = 2;
 const int CPU_SIGN_DETECTION = 3;
 
+static const ProcessParams sequencerParams = {
+    cpuSequencer,
+    SCHED_FIFO,
+    99,
+    0 };
+
+static const ThreadConfigData sequencerThreadConfig = {
+    true,
+    "sequencer",
+    sequencerParams };
+
 static const ProcessParams captureParams = {
     cpuCapture,
-    SCHED_RR,
-    99,
+    SCHED_FIFO,
+    98,
     0};
 
 static const ThreadConfigData captureThreadConfig = {
@@ -43,8 +73,8 @@ static const ThreadConfigData captureThreadConfig = {
 
 static const ProcessParams laneDetectionParams = {
     cpuLaneDetection,
-    SCHED_RR,
-    98,
+    SCHED_FIFO,
+    90,
     0};
 
 static const ThreadConfigData laneDetectionThreadConfig = {
@@ -54,8 +84,8 @@ static const ThreadConfigData laneDetectionThreadConfig = {
 
 static const ProcessParams carDetectionParams = {
     cpuCarDetection,  // CPU1
-    SCHED_RR,
-    98,  // highest priority
+    SCHED_FIFO,
+    90,  // highest priority
     0};
 
 static const ThreadConfigData carDetectionThreadConfig = {
@@ -65,8 +95,8 @@ static const ThreadConfigData carDetectionThreadConfig = {
 
 static const ProcessParams signDetectionParams = {
     cpuSignDetection,
-    SCHED_RR,
-    98,
+    SCHED_FIFO,
+    90,
     0};
 
 static const ThreadConfigData signDetectionThreadConfig = {
@@ -85,6 +115,7 @@ extern bool abortS1;
 extern bool abortS2;
 extern bool abortS3;
 extern bool abortS4;
+extern bool abortSequencer;
 extern sem_t* semS1;
 extern sem_t* semS2;
 extern sem_t* semS3;

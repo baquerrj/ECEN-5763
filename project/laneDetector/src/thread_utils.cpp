@@ -55,6 +55,7 @@ const ThreadConfigData CAPTURE_THREAD_CONFIG = {
 
 int numCpus = NUM_CPUS;
 int cpuMain = CPU_MAIN;
+int cpuSequencer = CPU_MAIN;
 int cpuCapture = CPU_CAPTURE;
 int cpuLaneDetection = CPU_LANE_DETECTION;
 int cpuSignDetection = CPU_SIGN_DETECTION;
