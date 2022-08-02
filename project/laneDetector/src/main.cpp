@@ -147,7 +147,8 @@ int main( int argc, char** argv )
                                                  LineDetector::DEFAULT_DEVICE_ID,
                                                  videoInput,
                                                  doStore,
-                                                 store );
+                                                 store,
+                                                 show );
 
 // abortS3 = true;
     // abortS4 = true;
@@ -173,14 +174,14 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        // p_detector->showLanesImage();
+        p_detector->showLanesImage();
 
         if( doStore )
         {
             p_detector->writeFrameToVideo();
         }
 
-        winInput = cv::waitKey( 2 );
+        winInput = cv::waitKey( 30 );
         if( winInput == 27 )
         {
             break;

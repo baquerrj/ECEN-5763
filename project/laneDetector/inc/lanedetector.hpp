@@ -47,6 +47,7 @@ class LineDetector
                   const cv::String videoFilename = "",
                   bool writeOutputVideo = false,
                   const cv::String outputVideoFilename = "",
+                  bool showWindows = false,
                   int frameWidth = DEFAULT_FRAME_WIDTH,
                   int frameHeight = DEFAULT_FRAME_HEIGHT );
 
@@ -130,6 +131,7 @@ class LineDetector
     int myFrameWidth;
     int myFrameHeight;
     int myDeviceId;
+    bool showWindows;
 
     double carsDeltaTimes;
     double lanesDeltaTimes;
@@ -167,20 +169,12 @@ class LineDetector
     cv::Mat myCannyOutput;
     cv::Mat myGrayscaleImage;
 
-
-
     cv::CascadeClassifier myClassifier;
 
     RingBuffer< cv::Mat >* p_myRawBuffer;
-    RingBuffer< cv::Mat >* p_myGrayscaleBuffer;
+    RingBuffer< cv::Mat >* p_bufferForCarDetection;
     RingBuffer< cv::Mat >* p_myReadyToAnnotateBuffer;
     RingBuffer< cv::Mat >* p_myFinalBuffer;
-
-
-
-
-
-
 
     cv::Point roiPoints[ 4 ];
     cv::Mat roi;
@@ -191,6 +185,8 @@ class LineDetector
     RingBuffer< std::vector< cv::Rect> >* vehicle;
 
     pthread_mutex_t lock;
+    pthread_mutex_t roiLock;
+    pthread_mutex_t carRingLock;
 
     protected:
     // Capture Thread
@@ -263,26 +259,5 @@ inline bool LineDetector::newFrameReady()
 {
     return myNewFrameReady;
 }
-
-// inline bool LineDetector::isFrameEmpty()
-// {
-//     return mySource.empty();
-// }
-
-// inline void LineDetector::showSourceImage()
-// {
-//     if( not mySource.empty() )
-//     {
-//         imshow( SOURCE_WINDOW_NAME, mySource );
-//     }
-// }
-
-// inline void LineDetector::showLanesImage()
-// {
-//     if( not p_myFinalBuffer->isEmpty() )
-//     {
-//         imshow( DETECTED_LANES_IMAGE, p_myFinalBuffer->dequeue() );
-//     }
-// }
 
 #endif // __LANE_DETECTOR_HPP__
