@@ -13,7 +13,7 @@ class CyclicThread;
 class Sequencer : public FrameBase
 {
 public:
-   Sequencer( uint8_t frequency );
+   Sequencer();
    ~Sequencer();
 
    void sequenceServices();
@@ -26,9 +26,9 @@ private:
 };
 
 
-inline Sequencer& getSequencer( uint8_t captureFrequency = 1 )
+inline Sequencer& getSequencer()
 {
-   static std::unique_ptr< Sequencer > singleton( new Sequencer( captureFrequency ) );
+   static std::unique_ptr< Sequencer > singleton( new Sequencer() );
    return *singleton;
 }
 

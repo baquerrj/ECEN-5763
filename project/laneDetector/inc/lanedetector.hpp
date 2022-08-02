@@ -87,13 +87,14 @@ class LineDetector
 
     bool newFrameReady();
 
+    void annotateImage();
+
     virtual void shutdown();
-
     virtual bool isAlive();
-
     virtual bool isCaptureThreadAlive();
     virtual bool isLineThreadAlive();
     virtual bool isCarThreadAlive();
+    virtual bool isAnnotationThreadAlive();
 
     virtual pthread_t getCaptureThreadId();
 
@@ -111,10 +112,10 @@ class LineDetector
     static void* executeCapture( void* context );
     static void* executeLine( void* context );
     static void* executeCar( void* context );
+    static void* executeAnnotation( void* context );
 
 
     private:
-    Mat annot;
     VideoCapture myVideoCapture;
     VideoWriter myVideoWriter;
     int myHoughLinesPThreshold;
@@ -122,6 +123,8 @@ class LineDetector
     int myMaxLineGap;
     bool myNewFrameReady;
     bool myCreatedOk;
+    bool lanesReady;
+    bool carsReady;
 
     Mat rawImage;
     Mat imageToProcess;
@@ -143,17 +146,20 @@ class LineDetector
 
     RingBuffer< Mat >* p_myRawBuffer;
     RingBuffer< Mat >* p_myGrayscaleBuffer;
+    RingBuffer< Mat >* p_myReadyToAnnotateBuffer;
     RingBuffer< Mat >* p_myFinalBuffer;
 
     uint64_t framesProcessed;
 
     Point roiPoints[ 4 ];
     Mat roi;
-    Point leftPt1;
-    Point leftPt2;
-    Point rightPt1;
-    Point rightPt2;
+    RingBuffer< Point >* leftPt1;
+    RingBuffer< Point >* leftPt2;
+    RingBuffer< Point >* rightPt1;
+    RingBuffer< Point >* rightPt2;
+    RingBuffer< std::vector<Rect> >* vehicle;
 
+    pthread_mutex_t lock;
 
     bool foundLeft;
     bool foundRight;
@@ -179,12 +185,20 @@ class LineDetector
     bool carDetectionThreadAlive;
     sem_t carDetectionThreadSem;
     CyclicThread* carDetectionThread;
+
+    std::string annotationThreadName;
+    bool annotationThreadAlive;
+    sem_t annotationThreadSem;
+    CyclicThread* annotationThread;
 };
 
 
 inline bool LineDetector::isAlive()
 {
-    return ( isCaptureThreadAlive() || isLineThreadAlive() || isCarThreadAlive() );
+    return ( isCaptureThreadAlive() ||
+             isLineThreadAlive() ||
+             isCarThreadAlive() ||
+             isAnnotationThreadAlive() );
 }
 
 inline sem_t* LineDetector::getCaptureSemaphore()

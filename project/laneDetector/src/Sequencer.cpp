@@ -13,11 +13,10 @@
 
 #define EXTRA_CYCLES ( 20 )
 
-Sequencer::Sequencer( uint8_t frequency ) :
-    FrameBase( sequencerThreadConfig ),
-    captureFrequency( frequency )
+Sequencer::Sequencer() :
+    FrameBase( sequencerThreadConfig )
 {
-    requiredIterations = ( ( 2000 + EXTRA_CYCLES ) * SEQUENCER_FREQUENCY ) / captureFrequency;
+    requiredIterations = ( ( 2000 + EXTRA_CYCLES ) * SEQUENCER_FREQUENCY );
     executionTimes = new double[requiredIterations] {};
     if( executionTimes == NULL )
     {
@@ -53,12 +52,17 @@ Sequencer::~Sequencer()
 
 void Sequencer::sequenceServices()
 {
-    struct timespec delay_time = { 0, 15000000 };  // delay for 20 msec, 50Hz
+    // struct timespec delay_time = { 0, 50000000 };   // delay for 50 msec, 20Hz
+    struct timespec delay_time = { 0, 20000000 };   // delay for 20 msec
     struct timespec remaining_time;
     double residual;
     int rc, delay_cnt = 0;
 
-    static uint8_t divisor = SEQUENCER_FREQUENCY / captureFrequency;
+    static uint8_t S1_COUNT = 1;    // 1 Sequencer Period = (FREQUENCY/COUNT) = (50/1) = 50Hz
+    static uint8_t S2_COUNT = 2;    // 2 Sequencer Periods = (FREQUENCY/COUNT) = (50/2) = 25Hz
+    static uint8_t S3_COUNT = 3;    // 3 Sequencer Periods = (FREQUENCY/COUNT) = (50/3) = 18Hz
+    // static uint8_t divisor = SEQUENCER_FREQUENCY;
+    static uint8_t divisor = SEQUENCER_FREQUENCY / 20;
 
     do
     {
@@ -105,28 +109,28 @@ void Sequencer::sequenceServices()
 
         // Release each service at a sub-rate of the generic sequencer rate
         // Servcie_1 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS1 and ( count % divisor ) == 0 )
+        if( not abortS1 and ( count % S1_COUNT ) == 0 )
         {
             LogTrace( "S1 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS1 );
         }
 
         // Servcie_2 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS2 and ( count % divisor ) == 0 )
+        if( not abortS2 and ( count % S3_COUNT ) == 0 )
         {
             LogTrace( "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS2 );
         }
 
         // Servcie_3 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS3 and ( count % divisor ) == 0 )
+        if( not abortS3 and ( count % S3_COUNT ) == 0 )
         {
             LogTrace( "S3 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS3 );
         }
 
         // Servcie_4 = RT_MIN	@ CAPTURE_FREQUENCY (0.1Hz or 1Hz)
-        if( not abortS4 and ( count % ( divisor * 10 ) ) == 0 )
+        if( not abortS4 and ( count % S2_COUNT ) == 0 )
         {
             LogTrace( "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS4 );

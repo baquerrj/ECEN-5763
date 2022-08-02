@@ -48,10 +48,11 @@ const int CPU_CAPTURE = CPU_MAIN;
 const int CPU_LANE_DETECTION = 1;
 const int CPU_CAR_DETECTION = 2;
 const int CPU_SIGN_DETECTION = 3;
+const int CPU_ANNOTATION = 3;
 
 static const ProcessParams sequencerParams = {
     cpuSequencer,
-    SCHED_FIFO,
+    SCHED_RR,
     99,
     0 };
 
@@ -62,7 +63,7 @@ static const ThreadConfigData sequencerThreadConfig = {
 
 static const ProcessParams captureParams = {
     cpuCapture,
-    SCHED_FIFO,
+    SCHED_RR,
     98,
     0};
 
@@ -73,8 +74,8 @@ static const ThreadConfigData captureThreadConfig = {
 
 static const ProcessParams laneDetectionParams = {
     cpuLaneDetection,
-    SCHED_FIFO,
-    90,
+    SCHED_RR,
+    99,
     0};
 
 static const ThreadConfigData laneDetectionThreadConfig = {
@@ -84,8 +85,8 @@ static const ThreadConfigData laneDetectionThreadConfig = {
 
 static const ProcessParams carDetectionParams = {
     cpuCarDetection,  // CPU1
-    SCHED_FIFO,
-    90,  // highest priority
+    SCHED_RR,
+    99,  // highest priority
     0};
 
 static const ThreadConfigData carDetectionThreadConfig = {
@@ -95,8 +96,8 @@ static const ThreadConfigData carDetectionThreadConfig = {
 
 static const ProcessParams signDetectionParams = {
     cpuSignDetection,
-    SCHED_FIFO,
-    90,
+    SCHED_RR,
+    99,
     0};
 
 static const ThreadConfigData signDetectionThreadConfig = {
@@ -104,11 +105,22 @@ static const ThreadConfigData signDetectionThreadConfig = {
     "signDetection",
     signDetectionParams};
 
+static const ProcessParams annotationParams = {
+    cpuAnnotation,
+    SCHED_RR,
+    99,
+    0 };
+
+static const ThreadConfigData annotationThreadConfig = {
+    true,
+    "annotation",
+    annotationParams };
+
 static const ThreadConfigData threadConfigurations[ 4 ] ={
     captureThreadConfig,
     laneDetectionThreadConfig,
     carDetectionThreadConfig,
-    signDetectionThreadConfig
+    annotationThreadConfig
 };
 
 extern bool abortS1;

@@ -60,7 +60,7 @@ int cpuCapture = CPU_CAPTURE;
 int cpuLaneDetection = CPU_LANE_DETECTION;
 int cpuSignDetection = CPU_SIGN_DETECTION;
 int cpuCarDetection = CPU_CAR_DETECTION;
-
+int cpuAnnotation = CPU_ANNOTATION;
 
 static bool name_is_valid( const std::string name );
 

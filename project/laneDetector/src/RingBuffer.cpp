@@ -72,3 +72,18 @@ template cv::Mat RingBuffer< cv::Mat >::front();
 template bool RingBuffer< cv::Mat >::isEmpty();
 template bool RingBuffer< cv::Mat >::isFull();
 template size_t RingBuffer< cv::Mat >::size();
+
+template void RingBuffer< cv::Point >::enqueue( cv::Point item );
+template cv::Point RingBuffer< cv::Point >::dequeue();
+template cv::Point RingBuffer< cv::Point >::front();
+template bool RingBuffer< cv::Point >::isEmpty();
+template bool RingBuffer< cv::Point >::isFull();
+template size_t RingBuffer< cv::Point >::size();
+
+template void RingBuffer< std::vector< cv::Rect> >::enqueue( std::vector< cv::Rect> item );
+template std::vector< cv::Rect> RingBuffer< std::vector< cv::Rect> >::dequeue();
+template std::vector< cv::Rect> RingBuffer< std::vector< cv::Rect> >::front();
+template bool RingBuffer< std::vector< cv::Rect> >::isEmpty();
+template bool RingBuffer< std::vector< cv::Rect> >::isFull();
+template size_t RingBuffer< std::vector< cv::Rect> >::size();
+

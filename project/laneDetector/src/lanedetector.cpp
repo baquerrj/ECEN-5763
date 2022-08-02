@@ -14,6 +14,10 @@ using namespace std;
 
 #include "Logger.h"
 #include "RingBuffer.h"
+
+#define RED    (Scalar( 96,  94, 211))
+#define BLUE   (Scalar(203, 147, 114))
+
 extern pthread_mutex_t rawBufferLock;
 extern pthread_mutex_t grayscaleBufferLock;
 extern pthread_mutex_t imageLock;
@@ -31,6 +35,8 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
                             int frameWidth,
                             int frameHeight )
 {
+    carsReady = false;
+    lanesReady = false;
     myCreatedOk = true;
     myFrameHeight = frameHeight;
     myFrameWidth = frameWidth;
@@ -53,11 +59,19 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     foundLeft = false;
     foundRight = false;
 
+    pthread_mutex_init( &lock, NULL );
     createWindows();
 
     p_myRawBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
     p_myGrayscaleBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
     p_myFinalBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
+    p_myReadyToAnnotateBuffer = new RingBuffer< Mat >( RING_BUFFER_SIZE );
+
+    leftPt1 = new RingBuffer < Point >( 100 );
+    leftPt2 = new RingBuffer < Point >( 100 );
+    rightPt1 = new RingBuffer < Point >( 100 );
+    rightPt2 = new RingBuffer < Point >( 100 );
+    vehicle = new RingBuffer < std::vector< Rect > >( 100 );
 
     if( writeOutputVideo )
     {
@@ -133,6 +147,24 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
                     LogError( "Could not start thread for %s", carConfig.threadName.c_str() );
                     myCreatedOk = false;
                 }
+                if( myCreatedOk )
+                {
+                    ThreadConfigData annotationConfig = configData[ 3 ];
+                    annotationThread = new CyclicThread( annotationConfig,
+                                                           LineDetector::executeAnnotation,
+                                                           this,
+                                                           true );
+                    if( NULL == annotationThread )
+                    {
+                        LogError( "Could not allocated memory for %s", annotationConfig.threadName.c_str() );
+                        myCreatedOk = false;
+                    }
+                    if( not annotationThread->isThreadAlive() )
+                    {
+                        LogError( "Could not start thread for %s", annotationConfig.threadName.c_str() );
+                        myCreatedOk = false;
+                    }
+                }
             }
         }
     }
@@ -140,6 +172,7 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
 
 LineDetector::~LineDetector()
 {
+    pthread_mutex_destroy( &lock );
     if( myVideoCapture.isOpened() )
     {
         myVideoCapture.release();
@@ -170,11 +203,60 @@ LineDetector::~LineDetector()
         carDetectionThread = NULL;
     }
 
+    if( annotationThread )
+    {
+        delete annotationThread;
+        annotationThread = NULL;
+    }
+
     if( p_myRawBuffer )
     {
         delete p_myRawBuffer;
         p_myRawBuffer = NULL;
     }
+
+    if( p_myGrayscaleBuffer )
+    {
+        delete p_myGrayscaleBuffer;
+        p_myGrayscaleBuffer = NULL;
+    }
+
+    if( p_myFinalBuffer )
+    {
+        delete p_myFinalBuffer;
+        p_myFinalBuffer = NULL;
+    }
+
+    if( leftPt1 )
+    {
+        delete leftPt1;
+        leftPt1 = NULL;
+    }
+
+    if( leftPt2 )
+    {
+        delete leftPt2;
+        leftPt2 = NULL;
+    }
+
+    if( rightPt1 )
+    {
+        delete rightPt1;
+        rightPt1 = NULL;
+    }
+
+    if( rightPt2 )
+    {
+        delete rightPt2;
+        rightPt2 = NULL;
+    }
+
+    if( vehicle )
+    {
+        delete vehicle;
+        vehicle = NULL;
+    }
+
 }
 
 void* LineDetector::executeCapture( void* context )
@@ -224,14 +306,91 @@ void* LineDetector::executeLine( void* context )
     return NULL;
 }
 
+void* LineDetector::executeAnnotation( void* context )
+{
+    ( ( LineDetector* )context )->annotateImage();
+    return NULL;
+}
+
+void LineDetector::annotateImage()
+{
+    LogTrace( "Entered" );
+    if( abortS4 )
+    {
+        LogDebug( "Aborting %s.", annotationThread->getName() );
+        annotationThread->shutdown();
+        LogTrace( "Exiting" );
+        return;
+    }
+    sem_wait( semS4 );
+    // struct timespec now = { 0,0 };
+    // clock_gettime( CLOCK_REALTIME, &now );
+    // now.tv_nsec += ( 1000 * 100 ); // 100 usec wait
+    // pthread_mutex_lock( &lock );
+
+    if( rawImage.empty() )
+    {
+        pthread_mutex_unlock( &lock );
+        return;
+    }
+    if( foundLeft )
+    {
+        LogTrace( "Drawing detected left lane on image!" );
+        if( not leftPt1->isEmpty() and not leftPt2->isEmpty() )
+        {
+            line( rawImage, leftPt1->dequeue(), leftPt2->dequeue(), Scalar( 255, 0, 0 ), 3, LINE_4 );
+        }
+    }
+
+    // if( foundRight and isInsideRoi( rightPt1 ) and isInsideRoi( rightPt2 ) )
+    if( foundRight )
+    {
+        LogTrace( "Drawing detected right lane on image!" );
+        if( not rightPt1->isEmpty() and not rightPt2->isEmpty() )
+        {
+            line( rawImage, rightPt1->dequeue(), rightPt2->dequeue(), Scalar( 255, 0, 0 ), 3, LINE_4 );
+        }
+    }
+
+    LogTrace( "Drawing detected ROI on image!" );
+    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], Scalar( 255, 0, 0 ), 2, LINE_AA );
+    putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, Scalar( 255, 0, 0 ), 1.5 );
+
+    std::vector< Rect > tmpVehicle;
+    if( not vehicle->isEmpty() )
+    {
+        tmpVehicle = vehicle->dequeue();
+    }
+    for( size_t i = 0; i < tmpVehicle.size(); ++i )
+    {
+        rectangle( rawImage, tmpVehicle[ i ], CV_RGB( 255, 0, 0 ) );
+    }
+
+    imshow( DETECTED_LANES_IMAGE, rawImage );
+    // pthread_mutex_unlock( &lock );
+    // while( p_myFinalBuffer->isFull() and not abortS4 )
+    // {
+    //     usleep( int( 1000 * 2 ) );
+    //     continue;
+    // }
+
+    // if( not abortS4 )
+    // {
+    //     p_myFinalBuffer->enqueue( rawImage );
+    //     LogDebug( "New processed image ready!" );
+        framesProcessed++;
+    // }
+
+    // showLanesImage();
+}
+
 void* LineDetector::executeCar( void* context )
 {
     ( ( LineDetector* )context )->detectCars();
     return NULL;
 }
 
-#define RED    (Scalar( 96,  94, 211))
-#define BLUE   (Scalar(203, 147, 114))
+
 
 void LineDetector::detectLanes()
 {
@@ -257,7 +416,6 @@ void LineDetector::detectLanes()
     }
     pthread_mutex_unlock( &rawBufferLock );
 
-    annot = Mat(rawImage);
     cvtColor( rawImage, myGrayscaleImage, COLOR_BGR2GRAY );
 
     pthread_mutex_lock( &grayscaleBufferLock );
@@ -283,36 +441,36 @@ void LineDetector::detectLanes()
     findLeftLane(left);
     findRightLane(right);
 
-    // pthread_mutex_lock( &imageLock );
-    // if( foundLeft and isInsideRoi( leftPt1 ) and isInsideRoi( leftPt2 ) )
-    if( foundLeft )
-    {
-        LogDebug( "Drawing detected left lane on image!" );
-        line(rawImage, leftPt1, leftPt2, Scalar(255, 0, 0), 3, LINE_4 );
-    }
+    // // pthread_mutex_lock( &imageLock );
+    // // if( foundLeft and isInsideRoi( leftPt1 ) and isInsideRoi( leftPt2 ) )
+    // if( foundLeft )
+    // {
+    //     LogTrace( "Drawing detected left lane on image!" );
+    //     line(rawImage, leftPt1, leftPt2, Scalar(255, 0, 0), 3, LINE_4 );
+    // }
 
-    // if( foundRight and isInsideRoi( rightPt1 ) and isInsideRoi( rightPt2 ) )
-    if( foundRight )
-    {
-        LogDebug( "Drawing detected right lane on image!" );
-        line(rawImage, rightPt1, rightPt2, Scalar(255, 0, 0), 3, LINE_4 );
-    }
+    // // if( foundRight and isInsideRoi( rightPt1 ) and isInsideRoi( rightPt2 ) )
+    // if( foundRight )
+    // {
+    //     LogTrace( "Drawing detected right lane on image!" );
+    //     line(rawImage, rightPt1, rightPt2, Scalar(255, 0, 0), 3, LINE_4 );
+    // }
 
-    LogDebug( "Drawing detected ROI on image!" );
-    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], Scalar( 255, 0, 0 ), 2, LINE_AA );
-    putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, Scalar( 255, 0, 0 ), 1.5 );
+    // LogTrace( "Drawing detected ROI on image!" );
+    // rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], Scalar( 255, 0, 0 ), 2, LINE_AA );
+    // putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, Scalar( 255, 0, 0 ), 1.5 );
 
-    while( p_myFinalBuffer->isFull() and not abortS2 )
-    {
-        usleep( int(1000 * 2));
-        continue;
-    }
-    if( not abortS2 )
-    {
-        p_myFinalBuffer->enqueue( rawImage );
-        LogDebug( "New processed image ready!" );
-        framesProcessed++;
-    }
+    // while( p_myFinalBuffer->isFull() and not abortS2 )
+    // {
+    //     usleep( int(1000 * 2));
+    //     continue;
+    // }
+    // if( not abortS2 )
+    // {
+    //     p_myFinalBuffer->enqueue( rawImage );
+    //     LogDebug( "New processed image ready!" );
+    //     framesProcessed++;
+    // }
     // pthread_mutex_unlock( &imageLock );
     LogTrace( "Exiting" );
 }
@@ -361,7 +519,10 @@ void LineDetector::findLeftLane( Vec4i left )
 
         if( intersection( Point( 0, 0 ), Point( 1, 1 ), pt1, pt2, ret ) )
         {
-            leftPt1 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
+            if( not leftPt1->isFull() )
+            {
+                leftPt1->enqueue(Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ] );
+            }
         }
         else
         {
@@ -369,7 +530,10 @@ void LineDetector::findLeftLane( Vec4i left )
         }
         if( intersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            leftPt2 = Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
+            if( not leftPt2->isFull() )
+            {
+                leftPt2->enqueue( Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ] );
+            }
         }
         else
         {
@@ -416,8 +580,6 @@ void LineDetector::findRightLane( Vec4i right )
         i++;
     }
 
-
-
     if( foundRight )
     {
 
@@ -427,7 +589,10 @@ void LineDetector::findRightLane( Vec4i right )
 
         if( intersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            rightPt1 = Point( ret ) + roiPoints[ 0 ];
+            if( not rightPt1->isFull() )
+            {
+                rightPt1->enqueue( Point( ret ) + roiPoints[ 0 ] );
+            }
         }
         else
         {
@@ -436,7 +601,10 @@ void LineDetector::findRightLane( Vec4i right )
 
         if( intersection( Point( 0, roi.rows - 1 ), Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            rightPt2 = Point( ret ) + roiPoints[ 0 ];
+            if( not rightPt2->isFull() )
+            {
+                rightPt2->enqueue( Point( ret ) + roiPoints[ 0 ] );
+            }
         }
         else
         {
@@ -477,7 +645,6 @@ void LineDetector::detectCars()
         carDetectionThread->shutdown();
         return;
     }
-
     sem_wait( semS3 );
 
     pthread_mutex_lock( &grayscaleBufferLock );
@@ -487,15 +654,19 @@ void LineDetector::detectCars()
     }
     pthread_mutex_unlock( &grayscaleBufferLock );
 
-    vector<Rect> vehicle;
-    myClassifier.detectMultiScale( imageToProcess, vehicle );
-
-    pthread_mutex_lock( &imageLock );
-    for( size_t i = 0; i < vehicle.size(); ++i )
+    std::vector< Rect > tmpVehicle;
+    myClassifier.detectMultiScale( imageToProcess, tmpVehicle );
+    if( not vehicle->isFull() )
     {
-        rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+        vehicle->enqueue( tmpVehicle );
     }
-    pthread_mutex_unlock( &imageLock );
+
+    // pthread_mutex_lock( &imageLock );
+    // for( size_t i = 0; i < vehicle.size(); ++i )
+    // {
+    //     rectangle( myLanesImage, vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+    // }
+    // pthread_mutex_unlock( &imageLock );
 }
 
 bool LineDetector::loadClassifier( const String& classifier )
@@ -538,6 +709,7 @@ void LineDetector::shutdown()
     captureThread->shutdown();
     lineDetectionThread->shutdown();
     carDetectionThread->shutdown();
+    annotationThread->shutdown();
 }
 
 bool LineDetector::isCaptureThreadAlive()
@@ -553,6 +725,11 @@ bool LineDetector::isLineThreadAlive()
 bool LineDetector::isCarThreadAlive()
 {
     return carDetectionThread->isThreadAlive();
+}
+
+bool LineDetector::isAnnotationThreadAlive()
+{
+    return annotationThread->isThreadAlive();
 }
 
 pthread_t LineDetector::getCaptureThreadId()

@@ -131,13 +131,11 @@ int main( int argc, char** argv )
     // pthread_mutex_init( &grayscaleBufferLock, NULL );
     // pthread_mutex_init( &imageLock, NULL );
 
-    uint8_t captureFrequency = 20;
-    double serviceDeadline = 1 / ( double )captureFrequency;
     double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
 
     createSemaphoresAndMutexes();
 
-    Sequencer* p_sequencer = new Sequencer( captureFrequency );
+    Sequencer* p_sequencer = new Sequencer();
     if( p_sequencer == NULL )
     {
         LogFatal( "Sequencer creation failed!" );
@@ -152,7 +150,7 @@ int main( int argc, char** argv )
                                                  store );
 
 // abortS3 = true;
-    abortS4 = true;
+    // abortS4 = true;
     if( p_detector == NULL )
     {
         LogFatal( "Detector creation failed!" );
@@ -175,7 +173,7 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        p_detector->showLanesImage();
+        // p_detector->showLanesImage();
 
         if( doStore )
         {
@@ -196,6 +194,7 @@ int main( int argc, char** argv )
         while( p_sequencer->isAlive() )
         {
             LogTrace( "Waiting for Sequencer to abort..." );
+            sleep( 1 );
             continue;
         }
         delete p_sequencer;
@@ -206,12 +205,20 @@ int main( int argc, char** argv )
     {
         if( p_detector->isAlive() )
         {
+            sem_post( semS1 );
+            sem_post( semS2 );
+            sem_post( semS3 );
+            sem_post( semS4 );
+
             abortS1 = true;
             abortS2 = true;
             abortS3 = true;
+            abortS4 = true;
             while( p_detector->isAlive() )
             {
-                // loop here until all threads shut down
+                LogTrace( "Waiting for threads to abort..." );
+                p_detector->shutdown();
+                sleep( 1 );
                 continue;
             }
             framesProcessed = p_detector->getFramesProcessed();
