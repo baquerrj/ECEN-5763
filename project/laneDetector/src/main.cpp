@@ -90,7 +90,7 @@ static const char* keys = {
     "{show           |false|show intermediate steps}"
 };
 
-void printHelp( CommandLineParser* p_parser )
+void printHelp( cv::CommandLineParser* p_parser )
 {
     printf( "The program uses Hough line detection and Haar feature detection to identify and mark\n"
             "road lanes and cars on a video stream input\n\r" );
@@ -106,7 +106,7 @@ void printHelp( CommandLineParser* p_parser )
 
 int main( int argc, char** argv )
 {
-    CommandLineParser* p_parser = new CommandLineParser( argc, argv, keys );
+    cv::CommandLineParser* p_parser = new cv::CommandLineParser( argc, argv, keys );
     if( p_parser->get<bool>( "help" ) )
     {
         printHelp( p_parser );
@@ -115,8 +115,8 @@ int main( int argc, char** argv )
 
     bool show = p_parser->get<bool>( "show" );
     bool doStore = p_parser->has( "store" );
-    String store = p_parser->get<String>( "store" );
-    String videoInput = p_parser->get<String>( "@input" );
+    cv::String store = p_parser->get<cv::String>( "store" );
+    cv::String videoInput = p_parser->get<cv::String>( "@input" );
 
     if( videoInput.empty() )
     {
@@ -164,7 +164,7 @@ int main( int argc, char** argv )
 
     char winInput;
 
-    int framesProcessed = 0;
+    uint64_t framesProcessed = 0;
     struct timespec start = { 0, 0 };
     struct timespec stop = { 0, 0 };
 
@@ -180,7 +180,7 @@ int main( int argc, char** argv )
             p_detector->writeFrameToVideo();
         }
 
-        winInput = waitKey( 2 );
+        winInput = cv::waitKey( 2 );
         if( winInput == 27 )
         {
             break;
@@ -227,15 +227,22 @@ int main( int argc, char** argv )
         }
     }
 
+    if( p_parser )
+    {
+        delete p_parser;
+        p_parser = NULL;
+    }
 
     clock_gettime( CLOCK_REALTIME, &stop );
     double deltas = delta_t( &stop, &start );
     double deltaTMS = deltas / framesProcessed;
     double deltaT = deltaTMS / 1000.0;
 
-
-    printf( "Average Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
-    printf( "Average Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+    printf( "**** DISPLAY UPDATE RATE ****\n\r" );
+    printf( "Frames Processed: %ld\n\r", framesProcessed );
+    printf( "Average Display Frame Rate: %3.2f ms per frame\n\r", deltaTMS );
+    printf( "Average Display Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / deltaT );
+    printf( "**** DISPLAY UPDATE RATE ****\n\r" );
 
     sem_close( semS1 );
     sem_close( semS2 );

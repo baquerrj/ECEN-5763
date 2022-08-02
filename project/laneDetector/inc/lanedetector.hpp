@@ -9,20 +9,17 @@
 #include <semaphore.h>
 #include "RingBuffer.h"
 
-using namespace cv;
-
 // Forward declarartions
 class CyclicThread;
 struct ThreadConfigData;
 
-
 class LineDetector
 {
     public:
-    static const String SOURCE_WINDOW_NAME;
-    static const String DETECTED_LANES_IMAGE;
-    static const String DETECTED_VEHICLES_IMAGE;
-    static const String CAR_CLASSIFIER;
+    static const cv::String SOURCE_WINDOW_NAME;
+    static const cv::String DETECTED_LANES_IMAGE;
+    static const cv::String DETECTED_VEHICLES_IMAGE;
+    static const cv::String CAR_CLASSIFIER;
 
     static const int RING_BUFFER_SIZE = 100;
     static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 20;
@@ -47,15 +44,15 @@ class LineDetector
     public:
     LineDetector( const ThreadConfigData* configData,
                   int deviceId,
-                  const String videoFilename = "",
+                  const cv::String videoFilename = "",
                   bool writeOutputVideo = false,
-                  const String outputVideoFilename = "",
+                  const cv::String outputVideoFilename = "",
                   int frameWidth = DEFAULT_FRAME_WIDTH,
                   int frameHeight = DEFAULT_FRAME_HEIGHT );
 
     virtual ~LineDetector();
 
-    bool loadClassifier( const String& classifier );
+    bool loadClassifier( const cv::String& classifier );
 
     void createWindows();
 
@@ -69,7 +66,7 @@ class LineDetector
 
     void showVehiclesImage();
 
-    Mat getVehiclesImage();
+    cv::Mat getVehiclesImage();
 
     int getFrameRate();
 
@@ -81,11 +78,11 @@ class LineDetector
 
     void detectLanes();
 
-    bool intersection( Point2f o1, Point2f p1, Point2f o2, Point2f p2, Point2f& r );
+    bool intersection( cv::Point2f o1, cv::Point2f p1, cv::Point2f o2, cv::Point2f p2, cv::Point2f& r );
 
-    void findLeftLane( Vec4i left );
-    void findRightLane( Vec4i right );
-    bool isInsideRoi( Point p );
+    void findLeftLane( cv::Vec4i left );
+    void findRightLane( cv::Vec4i right );
+    bool isInsideRoi( cv::Point p );
     void detectCars();
 
     void writeFrameToVideo();
@@ -121,8 +118,8 @@ class LineDetector
 
 
     private:
-    VideoCapture myVideoCapture;
-    VideoWriter myVideoWriter;
+    bool foundLeft;
+    bool foundRight;
     int myHoughLinesPThreshold;
     int myMinLineLength;
     int myMaxLineGap;
@@ -130,44 +127,70 @@ class LineDetector
     bool myCreatedOk;
     bool lanesReady;
     bool carsReady;
-
-    Mat rawImage;
-    Mat imageToProcess;
-
-    Mat tmp;
-    Mat mySourceCopy;
-    Mat myLanesImage;
-    Mat myVehiclesImage;
-    Mat myCannyOutput;
-    Mat myGrayscaleImage;
-
     int myFrameWidth;
     int myFrameHeight;
     int myDeviceId;
-    String myVideoFilename;
-    String myOutputVideoFilename;
 
-    CascadeClassifier myClassifier;
-
-    RingBuffer< Mat >* p_myRawBuffer;
-    RingBuffer< Mat >* p_myGrayscaleBuffer;
-    RingBuffer< Mat >* p_myReadyToAnnotateBuffer;
-    RingBuffer< Mat >* p_myFinalBuffer;
+    double carsDeltaTimes;
+    double lanesDeltaTimes;
+    double annotationDeltaTimes;
 
     uint64_t framesProcessed;
+    uint64_t carsThreadFrames;
+    uint64_t lanesThreadFrames;
+    uint64_t annotationThreadFrames;
 
-    Point roiPoints[ 4 ];
-    Mat roi;
-    RingBuffer< Point >* leftPt1;
-    RingBuffer< Point >* leftPt2;
-    RingBuffer< Point >* rightPt1;
-    RingBuffer< Point >* rightPt2;
-    RingBuffer< std::vector<Rect> >* vehicle;
+    cv::String myVideoFilename;
+    cv::String myOutputVideoFilename;
+
+    struct timespec carsStart;
+    struct timespec carsStop;
+
+    struct timespec lanesStart;
+    struct timespec lanesStop;
+
+    struct timespec annotationStart;
+    struct timespec annotationStop;
+
+
+    cv::VideoCapture myVideoCapture;
+    cv::VideoWriter myVideoWriter;
+
+
+    cv::Mat rawImage;
+    cv::Mat imageToProcess;
+
+    cv::Mat tmp;
+    cv::Mat mySourceCopy;
+    cv::Mat myLanesImage;
+    cv::Mat myVehiclesImage;
+    cv::Mat myCannyOutput;
+    cv::Mat myGrayscaleImage;
+
+
+
+    cv::CascadeClassifier myClassifier;
+
+    RingBuffer< cv::Mat >* p_myRawBuffer;
+    RingBuffer< cv::Mat >* p_myGrayscaleBuffer;
+    RingBuffer< cv::Mat >* p_myReadyToAnnotateBuffer;
+    RingBuffer< cv::Mat >* p_myFinalBuffer;
+
+
+
+
+
+
+
+    cv::Point roiPoints[ 4 ];
+    cv::Mat roi;
+    RingBuffer< cv::Point >* leftPt1;
+    RingBuffer< cv::Point >* leftPt2;
+    RingBuffer< cv::Point >* rightPt1;
+    RingBuffer< cv::Point >* rightPt2;
+    RingBuffer< std::vector< cv::Rect> >* vehicle;
 
     pthread_mutex_t lock;
-
-    bool foundLeft;
-    bool foundRight;
 
     protected:
     // Capture Thread
@@ -211,24 +234,24 @@ inline sem_t* LineDetector::getCaptureSemaphore()
     return &captureThreadSem;
 }
 
-inline Mat LineDetector::getVehiclesImage()
+inline cv::Mat LineDetector::getVehiclesImage()
 {
     return myVehiclesImage;
 }
 
 inline int LineDetector::getFrameRate()
 {
-    return myVideoCapture.get( CAP_PROP_FPS );
+    return myVideoCapture.get( cv::CAP_PROP_FPS );
 }
 
 inline int LineDetector::getFrameWidth()
 {
-    return myVideoCapture.get( CAP_PROP_FRAME_WIDTH );
+    return myVideoCapture.get( cv::CAP_PROP_FRAME_WIDTH );
 }
 
 inline int LineDetector::getFrameHeight()
 {
-    return myVideoCapture.get( CAP_PROP_FRAME_HEIGHT );
+    return myVideoCapture.get( cv::CAP_PROP_FRAME_HEIGHT );
 }
 
 inline void LineDetector::showVehiclesImage()

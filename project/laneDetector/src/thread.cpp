@@ -28,9 +28,9 @@ CyclicThread::CyclicThread( const ThreadConfigData& configData ) :
 
 CyclicThread::~CyclicThread()
 {
-    LogDebug( "Entered" );
+    // LogDebug( "Entered" );
     terminate();
-    LogDebug( "Exiting" );
+    // LogDebug( "Exiting" );
 }
 
 void CyclicThread::setFunctionAndOwner( void* ( *execute_ )( void* context ),
@@ -67,9 +67,9 @@ void CyclicThread::initiateThread()
 
 void CyclicThread::terminate()
 {
-    LogDebug( "Entered" );
+    // LogDebug( "Entered" );
     cancel_and_join_thread( thread, threadIsAlive );
-    LogDebug( "Exiting" );
+    // LogDebug( "Exiting" );
 }
 
 void* CyclicThread::cycle()

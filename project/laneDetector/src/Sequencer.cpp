@@ -102,7 +102,7 @@ void Sequencer::sequenceServices()
         // Store start time in seconds
         startTimes[ count ] = ( ( double )start.tv_sec + ( double )( ( start.tv_nsec ) / ( double )1000000000 ) );
 
-        LogTrace( "SEQ Count: %llu   Sequencer start Time: %lf seconds\n", count, startTimes[ count ] );
+        syslog( LOG_INFO, "SEQ Count: %llu   Sequencer start Time: %lf seconds\n", count, startTimes[ count ] );
 
         if( delay_cnt > 1 )
             printf( "Sequencer looping delay %d\n", delay_cnt );
@@ -111,28 +111,28 @@ void Sequencer::sequenceServices()
         // Servcie_1 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
         if( not abortS1 and ( count % S1_COUNT ) == 0 )
         {
-            LogTrace( "S1 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
+            syslog( LOG_INFO, "S1 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS1 );
         }
 
         // Servcie_2 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
         if( not abortS2 and ( count % S3_COUNT ) == 0 )
         {
-            LogTrace( "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
+            syslog( LOG_INFO, "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS2 );
         }
 
         // Servcie_3 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
         if( not abortS3 and ( count % S3_COUNT ) == 0 )
         {
-            LogTrace( "S3 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
+            syslog( LOG_INFO, "S3 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS3 );
         }
 
         // Servcie_4 = RT_MIN	@ CAPTURE_FREQUENCY (0.1Hz or 1Hz)
         if( not abortS4 and ( count % S2_COUNT ) == 0 )
         {
-            LogTrace( "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
+            syslog( LOG_INFO, "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS4 );
         }
 
@@ -141,7 +141,7 @@ void Sequencer::sequenceServices()
 
         // executionTimes[ count ] = delta_t( &end, &start );
 
-        LogTrace( "SEQ Count: %llu   Sequencer end Time: %lf seconds\n", count, endTimes[ count ] );
+        syslog( LOG_INFO, "SEQ Count: %llu   Sequencer end Time: %lf seconds\n", count, endTimes[ count ] );
 
         count++;  //Increment the sequencer count
     } while( not abortSequencer and ( count < requiredIterations ) );
