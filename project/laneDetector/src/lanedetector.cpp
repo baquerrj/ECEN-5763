@@ -53,8 +53,8 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     myVideoCapture.set( CAP_PROP_FRAME_WIDTH, ( double )frameWidth );
 
     roiPoints[ 0 ] = Point( 350, 430 ); // top left
-    roiPoints[ 1 ] = Point( 750, 430 ); // top right
-    roiPoints[ 2 ] = Point( 750, 567 ); // bottom right
+    roiPoints[ 1 ] = Point( 770, 430 ); // top right
+    roiPoints[ 2 ] = Point( 770, 567 ); // bottom right
     roiPoints[ 3 ] = Point( 350, 567 ); // bottom left
     foundLeft = false;
     foundRight = false;
@@ -338,7 +338,7 @@ void LineDetector::annotateImage()
         LogTrace( "Drawing detected left lane on image!" );
         if( not leftPt1->isEmpty() and not leftPt2->isEmpty() )
         {
-            line( rawImage, leftPt1->dequeue(), leftPt2->dequeue(), Scalar( 255, 0, 0 ), 3, LINE_4 );
+            line( rawImage, leftPt1->dequeue(), leftPt2->dequeue(), RED, 2, LINE_4 );
         }
     }
 
@@ -348,13 +348,13 @@ void LineDetector::annotateImage()
         LogTrace( "Drawing detected right lane on image!" );
         if( not rightPt1->isEmpty() and not rightPt2->isEmpty() )
         {
-            line( rawImage, rightPt1->dequeue(), rightPt2->dequeue(), Scalar( 255, 0, 0 ), 3, LINE_4 );
+            line( rawImage, rightPt1->dequeue(), rightPt2->dequeue(), RED, 2, LINE_4 );
         }
     }
 
     LogTrace( "Drawing detected ROI on image!" );
-    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], Scalar( 255, 0, 0 ), 2, LINE_AA );
-    putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, Scalar( 255, 0, 0 ), 1.5 );
+    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, LINE_AA );
+    putText( rawImage, "ROI", roiPoints[ 0 ], FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
 
     std::vector< Rect > tmpVehicle;
     if( not vehicle->isEmpty() )
@@ -488,8 +488,10 @@ void LineDetector::findLeftLane( Vec4i left )
         30,
         0,
         0,
-        0.174533,
-        1.134464
+        // 0.174533,
+        // 1.134464
+        (10)*(CV_PI/180),
+        (65)*(CV_PI/180)
     );
 
     while( !( foundLeft ) && i < lines.size() )
@@ -517,7 +519,7 @@ void LineDetector::findLeftLane( Vec4i left )
         Point2f pt1 = Point2f( left[ 0 ], left[ 1 ] );
         Point2f pt2 = Point2f( left[ 2 ], left[ 3 ] );
 
-        if( intersection( Point( 0, 0 ), Point( 1, 1 ), pt1, pt2, ret ) )
+        if( intersection( Point( 0, 0 ), Point( 1, 0 ), pt1, pt2, ret ) )
         {
             if( not leftPt1->isFull() )
             {

@@ -39,6 +39,11 @@ class LineDetector
     static const int DEFAULT_DEVICE_ID = 0;
     static const bool DEFAULT_USE_CAMERA = false;
 
+    static const int LEFT_MINIMUM_THETA = 10;
+    static const int LEFT_MAXIMUM_THETA = 110;
+    static const int RIGHT_MINIMUM_THETA = 115;
+    static const int RIGHT_MAXIMUM_THETA = 170;
+
     public:
     LineDetector( const ThreadConfigData* configData,
                   int deviceId,
