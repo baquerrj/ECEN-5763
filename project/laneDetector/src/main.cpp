@@ -15,7 +15,7 @@
 #include "unistd.h"
 
 pthread_mutex_t grayscaleBufferLock;
-pthread_mutex_t imageLock;
+pthread_mutex_t framesProcessedLock;
 pthread_mutex_t rawBufferLock;
 
 bool abortS1;
@@ -29,11 +29,13 @@ sem_t* semS2;
 sem_t* semS3;
 sem_t* semS4;
 
+uint64_t framesProcessed = 0;
+
 static void createSemaphoresAndMutexes()
 {
     pthread_mutex_init( &rawBufferLock, NULL );
     pthread_mutex_init( &grayscaleBufferLock, NULL );
-    pthread_mutex_init( &imageLock, NULL );
+    pthread_mutex_init( &framesProcessedLock, NULL );
 
     semS1 = sem_open( SEMS1_NAME, O_CREAT | O_EXCL, 0644, 0 );
     if( semS1 == SEM_FAILED )
@@ -118,6 +120,9 @@ int main( int argc, char** argv )
     cv::String store = p_parser->get<cv::String>( "store" );
     cv::String videoInput = p_parser->get<cv::String>( "@input" );
 
+    pthread_mutex_lock( &framesProcessedLock );
+    framesProcessed = 0;
+    pthread_mutex_unlock( &framesProcessedLock );
     if( videoInput.empty() )
     {
         LogFatal( "Missing path to test video!" );
@@ -129,7 +134,7 @@ int main( int argc, char** argv )
         LogInfo( "Using %s as source", videoInput.c_str() );
     }
     // pthread_mutex_init( &grayscaleBufferLock, NULL );
-    // pthread_mutex_init( &imageLock, NULL );
+    // pthread_mutex_init( &framesProcessedLock, NULL );
 
     double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
 
@@ -165,7 +170,6 @@ int main( int argc, char** argv )
 
     char winInput;
 
-    uint64_t framesProcessed = 0;
     struct timespec start = { 0, 0 };
     struct timespec stop = { 0, 0 };
 
@@ -209,6 +213,8 @@ int main( int argc, char** argv )
 
     if( p_detector )
     {
+        p_detector->printFrameRates();
+
         if( p_detector->isAlive() )
         {
             sem_post( semS1 );
@@ -227,8 +233,6 @@ int main( int argc, char** argv )
                 sleep( 1 );
                 continue;
             }
-            framesProcessed = p_detector->getFramesProcessed();
-            p_detector->printFrameRates();
             delete p_detector;
             p_detector = NULL;
         }
@@ -263,8 +267,8 @@ int main( int argc, char** argv )
 
     pthread_mutex_unlock( &grayscaleBufferLock );
     pthread_mutex_destroy( &grayscaleBufferLock );
-    pthread_mutex_unlock( &imageLock );
-    pthread_mutex_destroy( &imageLock );
+    pthread_mutex_unlock( &framesProcessedLock );
+    pthread_mutex_destroy( &framesProcessedLock );
 
     return 0;
 }

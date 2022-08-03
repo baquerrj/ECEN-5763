@@ -133,4 +133,6 @@ extern sem_t* semS2;
 extern sem_t* semS3;
 extern sem_t* semS4;
 
+extern uint64_t framesProcessed;
+
 #endif // __CONFIGURATION_HPP__

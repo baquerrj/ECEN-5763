@@ -53,15 +53,19 @@ Sequencer::~Sequencer()
 void Sequencer::sequenceServices()
 {
     // struct timespec delay_time = { 0, 50000000 };   // delay for 50 msec, 20Hz
-    struct timespec delay_time = { 0, 20000000 };   // delay for 20 msec
+    struct timespec delay_time = { 0, 25000000 };   // delay for 25 msec
     // struct timespec delay_time = { 0, 50000000 };   // delay for 50 msec
     struct timespec remaining_time;
     double residual;
     int rc, delay_cnt = 0;
 
-    static uint8_t S1_COUNT = 2;    // 1 Sequencer Period = (FREQUENCY/COUNT) = (50/1) = 50Hz
-    static uint8_t S2_COUNT = 2;    // 2 Sequencer Periods = (FREQUENCY/COUNT) = (50/2) = 25Hz
-    static uint8_t S3_COUNT = 3;    // 3 Sequencer Periods = (FREQUENCY/COUNT) = (50/3) = 18Hz
+    // 1 Sequencer Period = (FREQUENCY/COUNT) = (50/1) = 50Hz
+    // 2 Sequencer Periods = (FREQUENCY/COUNT) = (50/2) = 25Hz
+    // 3 Sequencer Periods = (FREQUENCY/COUNT) = (50/3) = 18Hz
+
+    static uint8_t FULL_PERIOD = 1;
+    static uint8_t HALF_PERIOD = 2;
+    static uint8_t THIRD_PERIOD = 3;
     // static uint8_t divisor = SEQUENCER_FREQUENCY;
     // static uint8_t divisor = SEQUENCER_FREQUENCY / 20;
 
@@ -110,21 +114,21 @@ void Sequencer::sequenceServices()
 
         // Release each service at a sub-rate of the generic sequencer rate
         // Servcie_1 = 25Hz
-        if( not abortS1 and ( count % 2 ) == 0 )
+        if( not abortS1 and ( count % FULL_PERIOD ) == 0 )
         {
             syslog( LOG_INFO, "S1 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS1 );
         }
 
         // Servcie_2 = 25Hz
-        if( not abortS2 and ( count % 2 ) == 0 )
+        if( not abortS2 and ( count % HALF_PERIOD ) == 0 )
         {
             syslog( LOG_INFO, "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS2 );
         }
 
         // Servcie_3 = 25Hz
-        if( not abortS3 and ( count % 1 ) == 0 )
+        if( not abortS3 and ( count % HALF_PERIOD ) == 0 )
         {
             syslog( LOG_INFO, "S3 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS3 );

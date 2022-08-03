@@ -24,6 +24,7 @@ class LineDetector
         cv::Point rightPt1;
         cv::Point rightPt2;
         std::vector< cv::Rect > vehicle;
+        uint64_t number;
     };
 
     public:
@@ -122,7 +123,8 @@ class LineDetector
 
     inline uint64_t getFramesProcessed()
     {
-        return framesProcessed;
+        // return framesProcessed;
+        return 1;
     }
 
     static void* executeCapture( void* context );
@@ -150,7 +152,7 @@ class LineDetector
     double lanesDeltaTimes;
     double annotationDeltaTimes;
 
-    uint64_t framesProcessed;
+    // uint64_t framesProcessed;
     uint64_t carsThreadFrames;
     uint64_t lanesThreadFrames;
     uint64_t annotationThreadFrames;
@@ -189,7 +191,7 @@ class LineDetector
     RingBuffer< cv::Mat >* p_myRawBuffer;
     RingBuffer< cv::Mat >* p_bufferForCarDetection;
     RingBuffer< cv::Mat >* p_myReadyToAnnotateBuffer;
-    RingBuffer< cv::Mat >* p_myFinalBuffer;
+    RingBuffer< frame_s >* p_myFinalBuffer;
 
     cv::Point roiPoints[ 4 ];
     cv::Point carPoints[ 4 ];

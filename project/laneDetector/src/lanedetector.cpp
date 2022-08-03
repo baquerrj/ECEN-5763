@@ -23,12 +23,13 @@ using namespace std;
 
 extern pthread_mutex_t rawBufferLock;
 extern pthread_mutex_t carRingLock;
-extern pthread_mutex_t imageLock;
+extern pthread_mutex_t framesProcessedLock;
 
 const cv::String LineDetector::SOURCE_WINDOW_NAME = "Source";
 const cv::String LineDetector::DETECTED_LANES_IMAGE = "Detected Lanes (in red)";
 const cv::String LineDetector::DETECTED_VEHICLES_IMAGE = "Detected Vehicles";
 const cv::String LineDetector::CAR_CLASSIFIER = "cars.xml";
+
 
 LineDetector::LineDetector( const ThreadConfigData* configData,
                             int deviceId,
@@ -54,7 +55,7 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     carsDeltaTimes( 0.0 ),
     lanesDeltaTimes( 0.0 ),
     annotationDeltaTimes( 0.0 ),
-    framesProcessed( 0 ),
+    // framesProcessed( 0 ),
     carsThreadFrames( 0 ),
     lanesThreadFrames( 0 ),
     annotationThreadFrames( 0 ),
@@ -105,7 +106,7 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
 
     p_myRawBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
     p_bufferForCarDetection = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
-    p_myFinalBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
+    p_myFinalBuffer = new RingBuffer< frame_s >( RING_BUFFER_SIZE );
     p_myReadyToAnnotateBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
 
     leftPt1 = new RingBuffer < cv::Point >( 100 );
@@ -372,7 +373,8 @@ void LineDetector::showLanesImage()
     {
         return;
     }
-    cv::Mat image = p_myFinalBuffer->dequeue();
+    frame_s f = p_myFinalBuffer->dequeue();
+    cv::Mat image = f.currentAnnotatedImage;
     if( showWindows )
     {
         cv::imshow( DETECTED_LANES_IMAGE, image );
@@ -381,7 +383,8 @@ void LineDetector::showLanesImage()
     if( saveFrames )
     {
         char filepath[ 100 ];
-        sprintf( filepath, "%s/%08ld.jpg", myOutputDirectory.c_str(), framesProcessed );
+        sprintf( filepath, "%s/%08ld.jpg", myOutputDirectory.c_str(), f.number );
+        LogTrace( "writing %s", filepath );
         cv::imwrite( std::string( filepath ), image );
     }
 }
@@ -412,7 +415,9 @@ void LineDetector::annotateImage()
     {
         return;
     }
+    pthread_mutex_lock( &frameLock );
     frame_s f = frames->dequeue();
+    pthread_mutex_unlock( &frameLock );
     f.currentAnnotatedImage = f.currentRawImage.clone();
 
     if( carDetectionThread->isThreadAlive() and f.vehicle.size() != 0 )
@@ -448,10 +453,15 @@ void LineDetector::annotateImage()
     rectangle( f.currentAnnotatedImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
     putText( f.currentAnnotatedImage, "ROI", roiPoints[ 0 ], cv::FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
     rectangle( f.currentAnnotatedImage, carPoints[ 0 ], carPoints[ 2 ], BLUE, 2, cv::LINE_AA );
-
-    p_myFinalBuffer->enqueue( f.currentAnnotatedImage );
-
+    pthread_mutex_lock( &framesProcessedLock );
     framesProcessed++;
+    f.number = framesProcessed;
+    pthread_mutex_unlock( &framesProcessedLock );
+    while( p_myFinalBuffer->isFull() )
+    {
+        usleep(1);
+    }
+    p_myFinalBuffer->enqueue( f );
 }
 
 void* LineDetector::executeCar( void* context )
@@ -691,15 +701,16 @@ void LineDetector::detectCars()
 
     std::vector< cv::Rect > tmpVehicle;
 
+    pthread_mutex_lock( &frameLock );
     if( frames->isEmpty() )
     {
+        pthread_mutex_unlock( &frameLock );
         // clock_gettime( CLOCK_REALTIME, &carsStop );
         // carsThreadFrames++;
         // carsDeltaTimes += delta_t( &carsStop, &carsStart );
         // sem_post( semS4 );
         return;
     }
-    pthread_mutex_lock( &frameLock );
     frame_s f = frames->dequeue();
     if( f.currentRawImage.empty() )
     {
