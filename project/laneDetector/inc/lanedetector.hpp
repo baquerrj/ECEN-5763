@@ -34,14 +34,6 @@ class LineDetector
     static const cv::String CAR_CLASSIFIER;
 
     static const int RING_BUFFER_SIZE = 100;
-    static const int INITIAL_PROBABILISTIC_HOUGH_THRESHOLD = 20;
-    static const int INITIAL_MIN_LINE_LENGTH = 10;
-    static const int INITIAL_MAX_LINE_LAP = 1;
-
-    static const int MAX_STANDARD_HOUGH_THRESHOLD = 300;
-    static const int MAX_PROBABILISTIC_HOUGH_THRESHOLD = 150;
-    static const int MAX_MIN_LINE_LENGTH = 100;
-    static const int MAX_MAX_LINE_LAP = 25;
 
     static const int DEFAULT_FRAME_WIDTH = 1280;
     static const int DEFAULT_FRAME_HEIGHT = 720;
@@ -102,8 +94,6 @@ class LineDetector
 
     void writeFrameToVideo();
 
-    bool newFrameReady();
-
     void annotateImage();
 
     virtual void shutdown();
@@ -115,16 +105,8 @@ class LineDetector
 
     virtual pthread_t getCaptureThreadId();
 
-    virtual sem_t* getCaptureSemaphore();
-
     bool createdOk() {
         return myCreatedOk;
-    }
-
-    inline uint64_t getFramesProcessed()
-    {
-        // return framesProcessed;
-        return 1;
     }
 
     static void* executeCapture( void* context );
@@ -136,10 +118,6 @@ class LineDetector
     private:
     bool foundLeft;
     bool foundRight;
-    int myHoughLinesPThreshold;
-    int myMinLineLength;
-    int myMaxLineGap;
-    bool myNewFrameReady;
     bool myCreatedOk;
     bool lanesReady;
     bool carsReady;
@@ -152,14 +130,12 @@ class LineDetector
     double lanesDeltaTimes;
     double annotationDeltaTimes;
 
-    // uint64_t framesProcessed;
     uint64_t carsThreadFrames;
     uint64_t lanesThreadFrames;
     uint64_t annotationThreadFrames;
 
     cv::String myVideoFilename;
     cv::String myOutputDirectory;
-
 
     struct timespec carsStart;
     struct timespec carsStop;
@@ -180,11 +156,6 @@ class LineDetector
     cv::Mat imageToProcess;
 
     cv::Mat tmp;
-    cv::Mat mySourceCopy;
-    cv::Mat myLanesImage;
-    cv::Mat myVehiclesImage;
-    cv::Mat myCannyOutput;
-    cv::Mat myGrayscaleImage;
 
     cv::CascadeClassifier myClassifier;
 
@@ -196,11 +167,6 @@ class LineDetector
     cv::Point roiPoints[ 4 ];
     cv::Point carPoints[ 4 ];
     cv::Mat roi;
-    RingBuffer< cv::Point >* leftPt1;
-    RingBuffer< cv::Point >* leftPt2;
-    RingBuffer< cv::Point >* rightPt1;
-    RingBuffer< cv::Point >* rightPt2;
-    RingBuffer< std::vector< cv::Rect> >* vehicle;
 
     RingBuffer< frame_s >* frames;
 
@@ -212,29 +178,23 @@ class LineDetector
 
     protected:
     // Capture Thread
-    // ThreadConfigData captureConfig;
     std::string captureThreadName;
     bool captureThreadAlive;
-    sem_t captureThreadSem;
     CyclicThread* captureThread;
 
     // Line Detection Thread
-    // ThreadConfigData lineConfig;
     std::string lineDetectionThreadName;
     bool lineDetectionThreadAlive;
-    sem_t lineDetectionThreadSem;
     CyclicThread* lineDetectionThread;
 
     // Car Detection Thread
-    // ThreadConfigData carCondig;
     std::string carDetectionThreadName;
     bool carDetectionThreadAlive;
-    sem_t carDetectionThreadSem;
     CyclicThread* carDetectionThread;
 
+    // Annotation Thread
     std::string annotationThreadName;
     bool annotationThreadAlive;
-    sem_t annotationThreadSem;
     CyclicThread* annotationThread;
 };
 
@@ -245,16 +205,6 @@ inline bool LineDetector::isAlive()
              isLineThreadAlive() ||
              isCarThreadAlive() ||
              isAnnotationThreadAlive() );
-}
-
-inline sem_t* LineDetector::getCaptureSemaphore()
-{
-    return &captureThreadSem;
-}
-
-inline cv::Mat LineDetector::getVehiclesImage()
-{
-    return myVehiclesImage;
 }
 
 inline int LineDetector::getFrameRate()
@@ -270,16 +220,6 @@ inline int LineDetector::getFrameWidth()
 inline int LineDetector::getFrameHeight()
 {
     return myVideoCapture.get( cv::CAP_PROP_FRAME_HEIGHT );
-}
-
-inline void LineDetector::showVehiclesImage()
-{
-    imshow( DETECTED_VEHICLES_IMAGE, myVehiclesImage );
-}
-
-inline bool LineDetector::newFrameReady()
-{
-    return myNewFrameReady;
 }
 
 #endif // __LANE_DETECTOR_HPP__

@@ -41,10 +41,6 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
                             int frameHeight ) :
     foundLeft( false ),
     foundRight( false ),
-    myHoughLinesPThreshold( INITIAL_PROBABILISTIC_HOUGH_THRESHOLD ),
-    myMinLineLength( INITIAL_MAX_LINE_LAP ),
-    myMaxLineGap( INITIAL_MIN_LINE_LENGTH ),
-    myNewFrameReady( false ),
     myCreatedOk( true ),
     lanesReady( false ),
     carsReady( false ),
@@ -55,7 +51,6 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     carsDeltaTimes( 0.0 ),
     lanesDeltaTimes( 0.0 ),
     annotationDeltaTimes( 0.0 ),
-    // framesProcessed( 0 ),
     carsThreadFrames( 0 ),
     lanesThreadFrames( 0 ),
     annotationThreadFrames( 0 ),
@@ -69,18 +64,6 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     annotationStop( { 0,0 } ),
     numberOfEmptyFrames( 0 )
 {
-    // carsReady = false;
-    // lanesReady = false;
-    // myCreatedOk = true;
-    // myFrameHeight = frameHeight;
-    // myFrameWidth = frameWidth;
-    // myDeviceId = deviceId;
-    // myVideoFilename = videoFilename;
-    // framesProcessed = 0;
-    // myHoughLinesPThreshold = INITIAL_PROBABILISTIC_HOUGH_THRESHOLD;
-    // myMaxLineGap = INITIAL_MAX_LINE_LAP;
-    // myMinLineLength = INITIAL_MIN_LINE_LENGTH;
-
     myVideoCapture = cv::VideoCapture( myVideoFilename );
 
     myVideoCapture.set( cv::CAP_PROP_FRAME_HEIGHT, ( double )frameHeight );
@@ -106,14 +89,9 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
 
     p_myRawBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
     p_bufferForCarDetection = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
-    p_myFinalBuffer = new RingBuffer< frame_s >( RING_BUFFER_SIZE );
     p_myReadyToAnnotateBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
 
-    leftPt1 = new RingBuffer < cv::Point >( 100 );
-    leftPt2 = new RingBuffer < cv::Point >( 100 );
-    rightPt1 = new RingBuffer < cv::Point >( 100 );
-    rightPt2 = new RingBuffer < cv::Point >( 100 );
-    vehicle = new RingBuffer < std::vector< cv::Rect > >( 100 );
+    p_myFinalBuffer = new RingBuffer< frame_s >( RING_BUFFER_SIZE );
     frames = new RingBuffer < frame_s >( 100 );
 
     if( saveFrames )
@@ -141,7 +119,6 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
 
     if( myCreatedOk )
     {
-        myNewFrameReady = false;
         ThreadConfigData captureConfig = configData[ 0 ];
         captureThread = new CyclicThread( captureConfig,
                                           LineDetector::executeCapture,
@@ -179,9 +156,9 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
             {
                 ThreadConfigData carConfig = configData[ 2 ];
                 carDetectionThread = new CyclicThread( carConfig,
-                                                        LineDetector::executeCar,
-                                                        this,
-                                                        true );
+                                                       LineDetector::executeCar,
+                                                       this,
+                                                       true );
                 if( NULL == carDetectionThread )
                 {
                     LogError( "Could not allocated memory for %s", carConfig.threadName.c_str() );
@@ -196,9 +173,9 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
                 {
                     ThreadConfigData annotationConfig = configData[ 3 ];
                     annotationThread = new CyclicThread( annotationConfig,
-                                                           LineDetector::executeAnnotation,
-                                                           this,
-                                                           true );
+                                                         LineDetector::executeAnnotation,
+                                                         this,
+                                                         true );
                     if( NULL == annotationThread )
                     {
                         LogError( "Could not allocated memory for %s", annotationConfig.threadName.c_str() );
@@ -294,37 +271,6 @@ LineDetector::~LineDetector()
         delete p_myFinalBuffer;
         p_myFinalBuffer = NULL;
     }
-
-    if( leftPt1 )
-    {
-        delete leftPt1;
-        leftPt1 = NULL;
-    }
-
-    if( leftPt2 )
-    {
-        delete leftPt2;
-        leftPt2 = NULL;
-    }
-
-    if( rightPt1 )
-    {
-        delete rightPt1;
-        rightPt1 = NULL;
-    }
-
-    if( rightPt2 )
-    {
-        delete rightPt2;
-        rightPt2 = NULL;
-    }
-
-    if( vehicle )
-    {
-        delete vehicle;
-        vehicle = NULL;
-    }
-
 }
 
 void* LineDetector::executeCapture( void* context )
@@ -351,11 +297,9 @@ void LineDetector::readFrame()
         return;
     }
     sem_wait( semS1 );
-    myNewFrameReady = false;
     while( p_myRawBuffer->isFull() )
     {
         LogTrace( "Raw Buffer is full" );
-        myNewFrameReady = false;
         usleep( 1 );
     }
     myVideoCapture.read( tmp );
@@ -364,7 +308,6 @@ void LineDetector::readFrame()
         numberOfEmptyFrames++;
     }
     p_myRawBuffer->enqueue( tmp );
-    myNewFrameReady = true;
 }
 
 void LineDetector::showLanesImage()
@@ -425,29 +368,23 @@ void LineDetector::annotateImage()
         LogTrace( "Annotating cars on image (frame #%ld)!", framesProcessed );
         for( size_t i = 0; i < f.vehicle.size(); ++i )
         {
-            cv::Point rect[2];
-            rect[0].x = f.vehicle[i].x;
-            rect[0].y = f.vehicle[i].y + 380;
+            cv::Point rect[ 2 ];
+            rect[ 0 ].x = f.vehicle[ i ].x;
+            rect[ 0 ].y = f.vehicle[ i ].y + 380;
             rect[ 1 ].x = f.vehicle[ i ].x + f.vehicle[ i ].width;
             rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + 380;
-            rectangle( f.currentAnnotatedImage, rect[0], rect[1], CV_RGB( 255, 0, 0 ), 3 );
+            rectangle( f.currentAnnotatedImage, rect[ 0 ], rect[ 1 ], CV_RGB( 255, 0, 0 ), 3 );
         }
     }
 
     if( foundLeft )
     {
-        // if( not leftPt1->isEmpty() and not leftPt2->isEmpty() )
-        // {
-            line( f.currentAnnotatedImage, f.leftPt1, f.leftPt2, RED, 2, cv::LINE_4 );
-        // }
+        line( f.currentAnnotatedImage, f.leftPt1, f.leftPt2, RED, 2, cv::LINE_4 );
     }
 
     if( foundRight )
     {
-        // if( not rightPt1->isEmpty() and not rightPt2->isEmpty() )
-        // {
-            line( f.currentAnnotatedImage, f.rightPt1, f.rightPt2, RED, 2, cv::LINE_4 );
-        // }
+        line( f.currentAnnotatedImage, f.rightPt1, f.rightPt2, RED, 2, cv::LINE_4 );
     }
 
     rectangle( f.currentAnnotatedImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
@@ -459,7 +396,7 @@ void LineDetector::annotateImage()
     pthread_mutex_unlock( &framesProcessedLock );
     while( p_myFinalBuffer->isFull() )
     {
-        usleep(1);
+        usleep( 1 );
     }
     p_myFinalBuffer->enqueue( f );
 }
@@ -481,7 +418,7 @@ void LineDetector::detectLanes()
         return;
     }
     sem_wait( semS2 );
-    clock_gettime(CLOCK_REALTIME, &lanesStart );
+    clock_gettime( CLOCK_REALTIME, &lanesStart );
     if( p_myRawBuffer->isEmpty() )
     {
         return;
@@ -512,8 +449,8 @@ void LineDetector::detectLanes()
     foundRight = false;
 
     pthread_mutex_lock( &frameLock );
-    findLeftLane(left, f);
-    findRightLane(right, f);
+    findLeftLane( left, f );
+    findRightLane( right, f );
     f.currentRawImage = raw;
     frames->enqueue( f );
     pthread_mutex_unlock( &frameLock );
@@ -524,7 +461,7 @@ void LineDetector::detectLanes()
     lanesDeltaTimes += delta_t( &lanesStop, &lanesStart );
 }
 
-void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
+void LineDetector::findLeftLane( cv::Vec4i left, frame_s& f )
 {
     vector< cv::Vec3f > lines;
     uint32_t i = 0;
@@ -537,8 +474,8 @@ void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
         30,
         0,
         0,
-        (10)*(CV_PI/180),
-        (65)*(CV_PI/180)
+        ( 10 ) * ( CV_PI / 180 ),
+        ( 65 ) * ( CV_PI / 180 )
     );
 
     while( !( foundLeft ) && i < lines.size() )
@@ -547,7 +484,6 @@ void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
         float rho = lines[ i ][ 0 ], theta = lines[ i ][ 1 ];
         if( abs( rho ) > 90 && abs( rho ) < 150 )
         {
-            //LOGP("rho: %f, theta: %f, votes: %f\n", rho, theta*180/CV_PI, lines[i][2]);
             double a = cos( theta );
             double b = sin( theta );
             double x0 = a * rho;
@@ -569,10 +505,7 @@ void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
 
         if( intersection( cv::Point( 0, 0 ), cv::Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            // if( not leftPt1->isFull() )
-            // {
-                f.leftPt1 = cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ];
-            // }
+            f.leftPt1 = cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ];
         }
         else
         {
@@ -580,10 +513,7 @@ void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
         }
         if( intersection( cv::Point( 0, roi.rows - 1 ), cv::Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            // if( not leftPt2->isFull() )
-            // {
-                f.leftPt2 = cv::Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
-            // }
+            f.leftPt2 = cv::Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
         }
         else
         {
@@ -637,10 +567,7 @@ void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
 
         if( intersection( cv::Point( 0, 0 ), cv::Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            // if( not rightPt1->isFull() )
-            // {
-                f.rightPt1 = cv::Point( ret ) + roiPoints[ 0 ];
-            // }
+            f.rightPt1 = cv::Point( ret ) + roiPoints[ 0 ];
         }
         else
         {
@@ -649,10 +576,7 @@ void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
 
         if( intersection( cv::Point( 0, roi.rows - 1 ), cv::Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            // if( not rightPt2->isFull() )
-            // {
-                f.rightPt2 = cv::Point( ret ) + roiPoints[ 0 ];
-            // }
+            f.rightPt2 = cv::Point( ret ) + roiPoints[ 0 ];
         }
         else
         {
@@ -705,10 +629,6 @@ void LineDetector::detectCars()
     if( frames->isEmpty() )
     {
         pthread_mutex_unlock( &frameLock );
-        // clock_gettime( CLOCK_REALTIME, &carsStop );
-        // carsThreadFrames++;
-        // carsDeltaTimes += delta_t( &carsStop, &carsStart );
-        // sem_post( semS4 );
         return;
     }
     frame_s f = frames->dequeue();
@@ -716,20 +636,15 @@ void LineDetector::detectCars()
     {
         frames->enqueue( f );
         pthread_mutex_unlock( &frameLock );
-        // clock_gettime( CLOCK_REALTIME, &carsStop );
-        // carsThreadFrames++;
-        // carsDeltaTimes += delta_t( &carsStop, &carsStart );
-        // sem_post( semS4 );
         return;
     }
     else
     {
         raw = f.currentRawImage;
         carImage = raw.clone();
-        cv::Mat carImageHalf = carImage( cv::Rect( carPoints[0], carPoints[2] ) );
+        cv::Mat carImageHalf = carImage( cv::Rect( carPoints[ 0 ], carPoints[ 2 ] ) );
         cv::Mat gray;
         cv::cvtColor( carImageHalf, gray, cv::COLOR_BGR2GRAY );
-        // cv::imshow( "1", gray );
         myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 4, 0, cv::Size( 16, 16 ), gray.size() );
     }
 
