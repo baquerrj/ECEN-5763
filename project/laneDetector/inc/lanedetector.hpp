@@ -69,7 +69,7 @@ class LineDetector
     bool loadClassifier( const cv::String& classifier );
 
     void createWindows();
-
+    void printFrameRates();
     void readFrame();
 
     bool isFrameEmpty();
@@ -192,6 +192,7 @@ class LineDetector
     RingBuffer< cv::Mat >* p_myFinalBuffer;
 
     cv::Point roiPoints[ 4 ];
+    cv::Point carPoints[ 4 ];
     cv::Mat roi;
     RingBuffer< cv::Point >* leftPt1;
     RingBuffer< cv::Point >* leftPt2;

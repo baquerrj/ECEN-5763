@@ -90,7 +90,14 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     roiPoints[ 2 ] = cv::Point( 770, 567 ); // bottom right
     roiPoints[ 3 ] = cv::Point( 350, 567 ); // bottom left
 
+    carPoints[ 0 ] = cv::Point( 0, 380 ); // top left
+    carPoints[ 1 ] = cv::Point( 800, 380 ); // top right
+    carPoints[ 2 ] = cv::Point( 800, 567 ); // bottom right
+    carPoints[ 3 ] = cv::Point( 0, 567 ); // bottom left
+
     pthread_mutex_init( &lock, NULL );
+    pthread_mutex_init( &frameLock, NULL );
+    pthread_mutex_init( &roiLock, NULL );
     if( showWindows )
     {
         createWindows();
@@ -207,7 +214,7 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     }
 }
 
-LineDetector::~LineDetector()
+void LineDetector::printFrameRates()
 {
     double lanesDeltaTimesMs = lanesDeltaTimes / lanesThreadFrames;
     double lanesDeltaTimeS = lanesDeltaTimesMs / 1000.0;
@@ -217,8 +224,22 @@ LineDetector::~LineDetector()
     printf( "Average Lane Detection Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / lanesDeltaTimeS );
     printf( "**** LANE DETECTION ****\n\r" );
 
+    double carsDeltaTimesMs = carsDeltaTimes / carsThreadFrames;
+    double carsDeltaTimeS = carsDeltaTimesMs / 1000.0;
+    printf( "**** CAR DETECTION ****\n\r" );
+    printf( "Frames Processed: %ld\n\r", carsThreadFrames );
+    printf( "Average Lane Detection Frame Rate: %3.2f ms per frame\n\r", carsDeltaTimesMs );
+    printf( "Average Lane Detection Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / carsDeltaTimeS );
+    printf( "**** CAR DETECTION ****\n\r" );
+}
+
+LineDetector::~LineDetector()
+{
+
+
     pthread_mutex_destroy( &lock );
     pthread_mutex_destroy( &roiLock );
+    pthread_mutex_destroy( &frameLock );
     if( myVideoCapture.isOpened() )
     {
         myVideoCapture.release();
@@ -343,15 +364,6 @@ void LineDetector::readFrame()
     }
     p_myRawBuffer->enqueue( tmp );
     myNewFrameReady = true;
-
-    // if( carDetectionThread->isThreadAlive() )
-    // {
-    //     while( p_bufferForCarDetection->isFull() )
-    //     {
-    //         usleep( 1 );
-    //     }
-    //     p_bufferForCarDetection->enqueue( tmp );
-    // }
 }
 
 void LineDetector::showLanesImage()
@@ -403,14 +415,19 @@ void LineDetector::annotateImage()
     frame_s f = frames->dequeue();
     f.currentAnnotatedImage = f.currentRawImage.clone();
 
-        // tmpVehicle = vehicle->dequeue();
-    // if( carDetectionThread->isThreadAlive() )
-    // {
-    //     for( size_t i = 0; i < f.vehicle.size(); ++i )
-    //     {
-    //         rectangle( rawImage, f.vehicle[ i ], CV_RGB( 255, 0, 0 ) );
-    //     }
-    // }
+    if( carDetectionThread->isThreadAlive() and f.vehicle.size() != 0 )
+    {
+        LogTrace( "Annotating cars on image (frame #%ld)!", framesProcessed );
+        for( size_t i = 0; i < f.vehicle.size(); ++i )
+        {
+            cv::Point rect[2];
+            rect[0].x = f.vehicle[i].x;
+            rect[0].y = f.vehicle[i].y + 380;
+            rect[ 1 ].x = f.vehicle[ i ].x + f.vehicle[ i ].width;
+            rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + 380;
+            rectangle( f.currentAnnotatedImage, rect[0], rect[1], CV_RGB( 255, 0, 0 ), 3 );
+        }
+    }
 
     if( foundLeft )
     {
@@ -430,6 +447,7 @@ void LineDetector::annotateImage()
 
     rectangle( f.currentAnnotatedImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
     putText( f.currentAnnotatedImage, "ROI", roiPoints[ 0 ], cv::FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
+    rectangle( f.currentAnnotatedImage, carPoints[ 0 ], carPoints[ 2 ], BLUE, 2, cv::LINE_AA );
 
     p_myFinalBuffer->enqueue( f.currentAnnotatedImage );
 
@@ -458,17 +476,18 @@ void LineDetector::detectLanes()
     {
         return;
     }
-
     cv::Mat raw = p_myRawBuffer->dequeue();
+
     if( raw.empty() )
     {
         return;
     }
-    cv::cvtColor( raw, myGrayscaleImage, cv::COLOR_BGR2GRAY );
-
 
     pthread_mutex_lock( &roiLock );
-    roi = myGrayscaleImage( cv::Rect( roiPoints[ 0 ], roiPoints[ 2 ] ) );
+    roi = raw( cv::Rect( roiPoints[ 0 ], roiPoints[ 2 ] ) );
+
+    cv::cvtColor( roi, roi, cv::COLOR_BGR2GRAY );
+
 
     cv::medianBlur( roi, roi, 5 );
 
@@ -482,17 +501,17 @@ void LineDetector::detectLanes()
     foundLeft = false;
     foundRight = false;
 
+    pthread_mutex_lock( &frameLock );
     findLeftLane(left, f);
     findRightLane(right, f);
-    pthread_mutex_unlock( &roiLock );
-
     f.currentRawImage = raw;
     frames->enqueue( f );
+    pthread_mutex_unlock( &frameLock );
+    pthread_mutex_unlock( &roiLock );
 
     clock_gettime( CLOCK_REALTIME, &lanesStop );
     lanesThreadFrames++;
     lanesDeltaTimes += delta_t( &lanesStop, &lanesStart );
-    sem_post( semS4 );
 }
 
 void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
@@ -665,23 +684,63 @@ void LineDetector::detectCars()
         return;
     }
     sem_wait( semS3 );
+    clock_gettime( CLOCK_REALTIME, &carsStart );
 
+    cv::Mat raw;
     cv::Mat carImage;
-    if( not p_bufferForCarDetection->isEmpty() )
-    {
-        carImage = p_bufferForCarDetection->dequeue();
-    }
 
-    if( carImage.empty() )
+    std::vector< cv::Rect > tmpVehicle;
+
+    if( frames->isEmpty() )
     {
+        // clock_gettime( CLOCK_REALTIME, &carsStop );
+        // carsThreadFrames++;
+        // carsDeltaTimes += delta_t( &carsStop, &carsStart );
+        // sem_post( semS4 );
         return;
     }
-    std::vector< cv::Rect > tmpVehicle;
-    myClassifier.detectMultiScale( carImage, tmpVehicle );
-    if( not vehicle->isFull() )
+    pthread_mutex_lock( &frameLock );
+    frame_s f = frames->dequeue();
+    if( f.currentRawImage.empty() )
     {
-        vehicle->enqueue( tmpVehicle );
+        frames->enqueue( f );
+        pthread_mutex_unlock( &frameLock );
+        // clock_gettime( CLOCK_REALTIME, &carsStop );
+        // carsThreadFrames++;
+        // carsDeltaTimes += delta_t( &carsStop, &carsStart );
+        // sem_post( semS4 );
+        return;
     }
+    else
+    {
+        raw = f.currentRawImage;
+        carImage = raw.clone();
+        cv::Mat carImageHalf = carImage( cv::Rect( carPoints[0], carPoints[2] ) );
+        cv::Mat gray;
+        cv::cvtColor( carImageHalf, gray, cv::COLOR_BGR2GRAY );
+        // cv::imshow( "1", gray );
+        myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 4, 0, cv::Size( 16, 16 ), gray.size() );
+    }
+
+    if( tmpVehicle.size() == 0 )
+    {
+        // LogTrace( "No detected cars!" );
+        // no cars detected in image
+    }
+    else if( f.vehicle.size() == 0 )
+    {
+        // LogTrace( "Adding detected cars!" );
+        // raw image has been updated by LaneDetection but
+        // we don't have any items in vehicle vector
+        f.vehicle = tmpVehicle;
+    }
+    frames->enqueue( f );
+    pthread_mutex_unlock( &frameLock );
+
+    clock_gettime( CLOCK_REALTIME, &carsStop );
+    carsThreadFrames++;
+    carsDeltaTimes += delta_t( &carsStop, &carsStart );
+    sem_post( semS4 );
 }
 
 bool LineDetector::loadClassifier( const cv::String& classifier )

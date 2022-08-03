@@ -134,7 +134,7 @@ int main( int argc, char** argv )
     double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
 
     createSemaphoresAndMutexes();
-    abortS3 = true;
+    // abortS3 = true;
     // abortS4 = true;
 
     Sequencer* p_sequencer = new Sequencer();
@@ -228,6 +228,7 @@ int main( int argc, char** argv )
                 continue;
             }
             framesProcessed = p_detector->getFramesProcessed();
+            p_detector->printFrameRates();
             delete p_detector;
             p_detector = NULL;
         }

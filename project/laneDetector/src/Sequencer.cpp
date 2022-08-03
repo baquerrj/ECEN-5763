@@ -54,6 +54,7 @@ void Sequencer::sequenceServices()
 {
     // struct timespec delay_time = { 0, 50000000 };   // delay for 50 msec, 20Hz
     struct timespec delay_time = { 0, 20000000 };   // delay for 20 msec
+    // struct timespec delay_time = { 0, 50000000 };   // delay for 50 msec
     struct timespec remaining_time;
     double residual;
     int rc, delay_cnt = 0;
@@ -62,7 +63,7 @@ void Sequencer::sequenceServices()
     static uint8_t S2_COUNT = 2;    // 2 Sequencer Periods = (FREQUENCY/COUNT) = (50/2) = 25Hz
     static uint8_t S3_COUNT = 3;    // 3 Sequencer Periods = (FREQUENCY/COUNT) = (50/3) = 18Hz
     // static uint8_t divisor = SEQUENCER_FREQUENCY;
-    static uint8_t divisor = SEQUENCER_FREQUENCY / 20;
+    // static uint8_t divisor = SEQUENCER_FREQUENCY / 20;
 
     do
     {
@@ -108,22 +109,22 @@ void Sequencer::sequenceServices()
             printf( "Sequencer looping delay %d\n", delay_cnt );
 
         // Release each service at a sub-rate of the generic sequencer rate
-        // Servcie_1 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS1 and ( count % S1_COUNT ) == 0 )
+        // Servcie_1 = 25Hz
+        if( not abortS1 and ( count % 2 ) == 0 )
         {
             syslog( LOG_INFO, "S1 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS1 );
         }
 
-        // Servcie_2 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS2 and ( count % S2_COUNT ) == 0 )
+        // Servcie_2 = 25Hz
+        if( not abortS2 and ( count % 2 ) == 0 )
         {
             syslog( LOG_INFO, "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS2 );
         }
 
-        // Servcie_3 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS3 and ( count % S3_COUNT ) == 0 )
+        // Servcie_3 = 25Hz
+        if( not abortS3 and ( count % 1 ) == 0 )
         {
             syslog( LOG_INFO, "S3 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS3 );
