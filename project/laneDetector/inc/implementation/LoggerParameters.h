@@ -6,7 +6,7 @@
 #define SIMPLE_CPP_LOGGER_LOGGERPARAMETERS_H
 
 #ifndef LOGGER_MAX_LOG_LEVEL_PRINTED
-#define LOGGER_MAX_LOG_LEVEL_PRINTED   6 // 6 = TRACE (max verbosity level)
+#define LOGGER_MAX_LOG_LEVEL_PRINTED   4 // 6 = TRACE (max verbosity level)
 #endif
 
 #ifndef LOGGER_PREFIX_LEVEL
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef LOGGER_ENABLE_COLORS
-#define LOGGER_ENABLE_COLORS   1
+#define LOGGER_ENABLE_COLORS   0
 #endif
 
 #ifndef LOGGER_ENABLE_COLORS_ON_USER_HEADER
