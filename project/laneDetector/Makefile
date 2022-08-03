@@ -19,10 +19,10 @@ DEPENDENCIES \
 
 all: build $(APP_DIR)/$(TARGET)
 
-debug: CXXFLAGS += -O0 -g -D LOGGER_PREFIX_LEVEL=4
+debug: CXXFLAGS += -O2 -g -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 -D LOGGER_PREFIX_LEVEL=4
 debug: all
 
-release: CXXFLAGS += -O2
+release: CXXFLAGS += -O2 -D LOGGER_MAX_LOG_LEVEL_PRINTED=4 -D LOGGER_PREFIX_LEVEL=2
 release: all
 
 $(OBJ_DIR)/%.o: %.cpp
@@ -47,6 +47,7 @@ remote: $(SRC) Makefile cars.xml
 	-@cd ../ && tar --exclude='laneDetector/bin' \
 	--exclude='laneDetector/build' \
 	--exclude='laneDetector/*.avi' \
+	--exclude='laneDetector/output*' \
 	-zcvf laneDetector.tgz laneDetector
 
 info:
