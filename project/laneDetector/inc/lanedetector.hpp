@@ -15,6 +15,17 @@ struct ThreadConfigData;
 
 class LineDetector
 {
+    struct frame_s
+    {
+        cv::Mat currentRawImage;   // frame that goes with this frame
+        cv::Mat currentAnnotatedImage;   // frame that goes with this frame
+        cv::Point leftPt1;
+        cv::Point leftPt2;
+        cv::Point rightPt1;
+        cv::Point rightPt2;
+        std::vector< cv::Rect > vehicle;
+    };
+
     public:
     static const cv::String SOURCE_WINDOW_NAME;
     static const cv::String DETECTED_LANES_IMAGE;
@@ -41,12 +52,14 @@ class LineDetector
     static const int RIGHT_MINIMUM_THETA = 115;
     static const int RIGHT_MAXIMUM_THETA = 170;
 
+    static const int EMPTY_FRAMES_PERSISTENCY_CHECK = 5;
+
     public:
     LineDetector( const ThreadConfigData* configData,
                   int deviceId,
                   const cv::String videoFilename = "",
-                  bool writeOutputVideo = false,
-                  const cv::String outputVideoFilename = "",
+                  bool saveFrames = false,
+                  const cv::String outputDirectory = "",
                   bool showWindows = false,
                   int frameWidth = DEFAULT_FRAME_WIDTH,
                   int frameHeight = DEFAULT_FRAME_HEIGHT );
@@ -81,8 +94,8 @@ class LineDetector
 
     bool intersection( cv::Point2f o1, cv::Point2f p1, cv::Point2f o2, cv::Point2f p2, cv::Point2f& r );
 
-    void findLeftLane( cv::Vec4i left );
-    void findRightLane( cv::Vec4i right );
+    void findLeftLane( cv::Vec4i left, frame_s &f );
+    void findRightLane( cv::Vec4i right, frame_s& f );
     bool isInsideRoi( cv::Point p );
     void detectCars();
 
@@ -132,7 +145,7 @@ class LineDetector
     int myFrameHeight;
     int myDeviceId;
     bool showWindows;
-
+    bool saveFrames;
     double carsDeltaTimes;
     double lanesDeltaTimes;
     double annotationDeltaTimes;
@@ -143,7 +156,8 @@ class LineDetector
     uint64_t annotationThreadFrames;
 
     cv::String myVideoFilename;
-    cv::String myOutputVideoFilename;
+    cv::String myOutputDirectory;
+
 
     struct timespec carsStart;
     struct timespec carsStop;
@@ -154,9 +168,10 @@ class LineDetector
     struct timespec annotationStart;
     struct timespec annotationStop;
 
+    uint16_t numberOfEmptyFrames;
 
     cv::VideoCapture myVideoCapture;
-    cv::VideoWriter myVideoWriter;
+    // cv::VideoWriter myVideoWriter;
 
 
     cv::Mat rawImage;
@@ -183,6 +198,10 @@ class LineDetector
     RingBuffer< cv::Point >* rightPt1;
     RingBuffer< cv::Point >* rightPt2;
     RingBuffer< std::vector< cv::Rect> >* vehicle;
+
+    RingBuffer< frame_s >* frames;
+
+    pthread_mutex_t frameLock;
 
     pthread_mutex_t lock;
     pthread_mutex_t roiLock;

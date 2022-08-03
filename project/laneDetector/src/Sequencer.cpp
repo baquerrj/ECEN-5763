@@ -58,7 +58,7 @@ void Sequencer::sequenceServices()
     double residual;
     int rc, delay_cnt = 0;
 
-    static uint8_t S1_COUNT = 1;    // 1 Sequencer Period = (FREQUENCY/COUNT) = (50/1) = 50Hz
+    static uint8_t S1_COUNT = 2;    // 1 Sequencer Period = (FREQUENCY/COUNT) = (50/1) = 50Hz
     static uint8_t S2_COUNT = 2;    // 2 Sequencer Periods = (FREQUENCY/COUNT) = (50/2) = 25Hz
     static uint8_t S3_COUNT = 3;    // 3 Sequencer Periods = (FREQUENCY/COUNT) = (50/3) = 18Hz
     // static uint8_t divisor = SEQUENCER_FREQUENCY;
@@ -116,7 +116,7 @@ void Sequencer::sequenceServices()
         }
 
         // Servcie_2 = RT_MAX-1	@ CAPTURE_FREQUENCY (1Hz or 10Hz)
-        if( not abortS2 and ( count % S3_COUNT ) == 0 )
+        if( not abortS2 and ( count % S2_COUNT ) == 0 )
         {
             syslog( LOG_INFO, "S2 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
             sem_post( semS2 );
@@ -130,11 +130,11 @@ void Sequencer::sequenceServices()
         }
 
         // Servcie_4 = RT_MIN	@ CAPTURE_FREQUENCY (0.1Hz or 1Hz)
-        if( not abortS4 and ( count % S2_COUNT ) == 0 )
-        {
-            syslog( LOG_INFO, "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
-            sem_post( semS4 );
-        }
+        // if( not abortS4 and ( count % S2_COUNT ) == 0 )
+        // {
+        //     syslog( LOG_INFO, "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
+        //     sem_post( semS4 );
+        // }
 
         clock_gettime( CLOCK_REALTIME, &end );
         endTimes[ count ] = ( ( double )end.tv_sec + ( double )( ( end.tv_nsec ) / ( double )1000000000 ) );
@@ -145,6 +145,11 @@ void Sequencer::sequenceServices()
 
         count++;  //Increment the sequencer count
     } while( not abortSequencer and ( count < requiredIterations ) );
+
+    sem_post( semS1 );
+    sem_post( semS2 );
+    sem_post( semS3 );
+    sem_post( semS4 );
 }
 
 void* Sequencer::execute( void* context )

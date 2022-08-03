@@ -9,6 +9,9 @@
 #include "thread_utils.hpp"
 #include "string.h"
 #include <unistd.h>
+#include <iostream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 using namespace std;
 
@@ -30,8 +33,8 @@ const cv::String LineDetector::CAR_CLASSIFIER = "cars.xml";
 LineDetector::LineDetector( const ThreadConfigData* configData,
                             int deviceId,
                             const cv::String videoFilename,
-                            bool writeOutputVideo,
-                            const cv::String outputVideoFilename,
+                            bool saveFrames,
+                            const cv::String outputDirectory,
                             bool showWindows,
                             int frameWidth,
                             int frameHeight ) :
@@ -56,13 +59,14 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     lanesThreadFrames( 0 ),
     annotationThreadFrames( 0 ),
     myVideoFilename( videoFilename ),
-    myOutputVideoFilename( outputVideoFilename ),
+    myOutputDirectory( outputDirectory ),
     carsStart( { 0,0 } ),
     carsStop( { 0,0 } ),
     lanesStart( { 0,0 } ),
     lanesStop( { 0,0 } ),
     annotationStart( { 0,0 } ),
-    annotationStop( { 0,0 } )
+    annotationStop( { 0,0 } ),
+    numberOfEmptyFrames( 0 )
 {
     // carsReady = false;
     // lanesReady = false;
@@ -102,19 +106,22 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     rightPt1 = new RingBuffer < cv::Point >( 100 );
     rightPt2 = new RingBuffer < cv::Point >( 100 );
     vehicle = new RingBuffer < std::vector< cv::Rect > >( 100 );
+    frames = new RingBuffer < frame_s >( 100 );
 
-    if( writeOutputVideo )
+    if( saveFrames )
     {
-        // myOutputVideoFilename = outputVideoFilename;
-        if( myOutputVideoFilename.empty() or myOutputVideoFilename == "" )
+        // myOutputDirectory = outputDirectory;
+        if( myOutputDirectory.empty() or myOutputDirectory == "" )
         {
-            myOutputVideoFilename = "output.avi";
+            myOutputDirectory = "outputFrames/";
         }
-        myVideoWriter.open( myOutputVideoFilename,
-                            cv::VideoWriter::fourcc( 'M', 'J', 'P', 'G' ),
-                            getFrameRate(),
-                            cv::Size( getFrameWidth(), getFrameHeight() ),
-                            true );
+
+        mkdir( myOutputDirectory.c_str(), 0777 );
+        // myVideoWriter.open( myOutputDirectory,
+        //                     cv::VideoWriter::fourcc( 'M', 'J', 'P', 'G' ),
+        //                     getFrameRate(),
+        //                     cv::Size( getFrameWidth(), getFrameHeight() ),
+        //                     true );
     }
 
 
@@ -211,15 +218,16 @@ LineDetector::~LineDetector()
     printf( "**** LANE DETECTION ****\n\r" );
 
     pthread_mutex_destroy( &lock );
+    pthread_mutex_destroy( &roiLock );
     if( myVideoCapture.isOpened() )
     {
         myVideoCapture.release();
     }
 
-    if( myVideoWriter.isOpened() )
-    {
-        myVideoWriter.release();
-    }
+    // if( myVideoWriter.isOpened() )
+    // {
+    //     myVideoWriter.release();
+    // }
 
     cv::destroyAllWindows();
 
@@ -311,60 +319,58 @@ void LineDetector::readFrame()
         captureThread->shutdown();
         return;
     }
+    if( numberOfEmptyFrames >= EMPTY_FRAMES_PERSISTENCY_CHECK )
+    {
+        abortS1 = true;
+        abortS2 = true;
+        abortS3 = true;
+        abortS4 = true;
+        abortSequencer = true;
+        return;
+    }
     sem_wait( semS1 );
     myNewFrameReady = false;
-    pthread_mutex_lock( &rawBufferLock );
-    if( p_myRawBuffer->isFull() )
+    while( p_myRawBuffer->isFull() )
     {
+        LogTrace( "Raw Buffer is full" );
         myNewFrameReady = false;
-        pthread_mutex_unlock( &rawBufferLock );
+        usleep( 1 );
     }
-    else
+    myVideoCapture.read( tmp );
+    if( tmp.empty() )
     {
-        myVideoCapture.read( tmp );
-        p_myRawBuffer->enqueue( tmp );
-        pthread_mutex_unlock( &rawBufferLock );
-        myNewFrameReady = true;
+        numberOfEmptyFrames++;
     }
+    p_myRawBuffer->enqueue( tmp );
+    myNewFrameReady = true;
 
-    pthread_mutex_lock( &carRingLock );
-    if( p_bufferForCarDetection->isFull() )
-    {
-        pthread_mutex_unlock( &carRingLock );
-    }
-    else
-    {
-        p_bufferForCarDetection->enqueue( tmp );
-        pthread_mutex_unlock( &carRingLock );
-    }
+    // if( carDetectionThread->isThreadAlive() )
+    // {
+    //     while( p_bufferForCarDetection->isFull() )
+    //     {
+    //         usleep( 1 );
+    //     }
+    //     p_bufferForCarDetection->enqueue( tmp );
+    // }
 }
 
 void LineDetector::showLanesImage()
 {
-    // if( not p_myFinalBuffer->isEmpty() )
-    // {
-    //     // LogDebug( "Updating final image on window!" );
-    //     imshow( DETECTED_LANES_IMAGE, p_myFinalBuffer->dequeue() );
-    // }
-
-    pthread_mutex_lock( &imageLock );
     if( p_myFinalBuffer->isEmpty() )
     {
-        pthread_mutex_unlock( &imageLock );
         return;
     }
     cv::Mat image = p_myFinalBuffer->dequeue();
-    pthread_mutex_unlock( &imageLock );
     if( showWindows )
     {
         cv::imshow( DETECTED_LANES_IMAGE, image );
     }
-    else
+
+    if( saveFrames )
     {
-        char buff[ 20 ];
-        sprintf( buff, "%08ld.jpg", framesProcessed );
-        cv::String fileName = "outputFrames/" + cv::String( buff );
-        cv::imwrite( fileName, image );
+        char filepath[ 100 ];
+        sprintf( filepath, "%s/%08ld.jpg", myOutputDirectory.c_str(), framesProcessed );
+        cv::imwrite( std::string( filepath ), image );
     }
 }
 
@@ -390,33 +396,27 @@ void LineDetector::annotateImage()
     }
     sem_wait( semS4 );
 
-    pthread_mutex_lock( &lock );
-    if( rawImage.empty() )
+    if( frames->isEmpty() )
     {
-        pthread_mutex_unlock( &lock );
         return;
     }
+    frame_s f = frames->dequeue();
+    f.currentAnnotatedImage = f.currentRawImage.clone();
 
-    std::vector< cv::Rect > tmpVehicle;
-    while( vehicle->isEmpty() or
-           leftPt1->isEmpty() or
-           leftPt2->isEmpty() or
-           rightPt1->isEmpty() or
-           rightPt2->isEmpty() )
-    {
-        usleep( 1 );
-    }
-    tmpVehicle = vehicle->dequeue();
-    for( size_t i = 0; i < tmpVehicle.size(); ++i )
-    {
-        rectangle( rawImage, tmpVehicle[ i ], CV_RGB( 255, 0, 0 ) );
-    }
+        // tmpVehicle = vehicle->dequeue();
+    // if( carDetectionThread->isThreadAlive() )
+    // {
+    //     for( size_t i = 0; i < f.vehicle.size(); ++i )
+    //     {
+    //         rectangle( rawImage, f.vehicle[ i ], CV_RGB( 255, 0, 0 ) );
+    //     }
+    // }
 
     if( foundLeft )
     {
         // if( not leftPt1->isEmpty() and not leftPt2->isEmpty() )
         // {
-            line( rawImage, leftPt1->dequeue(), leftPt2->dequeue(), RED, 2, cv::LINE_4 );
+            line( f.currentAnnotatedImage, f.leftPt1, f.leftPt2, RED, 2, cv::LINE_4 );
         // }
     }
 
@@ -424,16 +424,14 @@ void LineDetector::annotateImage()
     {
         // if( not rightPt1->isEmpty() and not rightPt2->isEmpty() )
         // {
-            line( rawImage, rightPt1->dequeue(), rightPt2->dequeue(), RED, 2, cv::LINE_4 );
+            line( f.currentAnnotatedImage, f.rightPt1, f.rightPt2, RED, 2, cv::LINE_4 );
         // }
     }
 
-    rectangle( rawImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
-    putText( rawImage, "ROI", roiPoints[ 0 ], cv::FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
+    rectangle( f.currentAnnotatedImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
+    putText( f.currentAnnotatedImage, "ROI", roiPoints[ 0 ], cv::FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
 
-    pthread_mutex_lock( &imageLock );
-    p_myFinalBuffer->enqueue( rawImage );
-    pthread_mutex_unlock( &imageLock );
+    p_myFinalBuffer->enqueue( f.currentAnnotatedImage );
 
     framesProcessed++;
 }
@@ -456,20 +454,17 @@ void LineDetector::detectLanes()
     }
     sem_wait( semS2 );
     clock_gettime(CLOCK_REALTIME, &lanesStart );
-    pthread_mutex_lock( &rawBufferLock );
     if( p_myRawBuffer->isEmpty() )
     {
-        pthread_mutex_unlock( &rawBufferLock );
         return;
     }
 
-    rawImage = p_myRawBuffer->dequeue();
-    pthread_mutex_unlock( &rawBufferLock );
-    if( rawImage.empty() )
+    cv::Mat raw = p_myRawBuffer->dequeue();
+    if( raw.empty() )
     {
         return;
     }
-    cv::cvtColor( rawImage, myGrayscaleImage, cv::COLOR_BGR2GRAY );
+    cv::cvtColor( raw, myGrayscaleImage, cv::COLOR_BGR2GRAY );
 
 
     pthread_mutex_lock( &roiLock );
@@ -480,22 +475,27 @@ void LineDetector::detectLanes()
     cv::adaptiveThreshold( roi, roi, 255,
                            cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 5, -2 );
 
+    frame_s f;
     cv::Vec4i left;
     cv::Vec4i right;
 
     foundLeft = false;
     foundRight = false;
 
-    findLeftLane(left);
-    findRightLane(right);
+    findLeftLane(left, f);
+    findRightLane(right, f);
     pthread_mutex_unlock( &roiLock );
+
+    f.currentRawImage = raw;
+    frames->enqueue( f );
 
     clock_gettime( CLOCK_REALTIME, &lanesStop );
     lanesThreadFrames++;
     lanesDeltaTimes += delta_t( &lanesStop, &lanesStart );
+    sem_post( semS4 );
 }
 
-void LineDetector::findLeftLane( cv::Vec4i left )
+void LineDetector::findLeftLane( cv::Vec4i left, frame_s &f )
 {
     vector< cv::Vec3f > lines;
     uint32_t i = 0;
@@ -540,10 +540,10 @@ void LineDetector::findLeftLane( cv::Vec4i left )
 
         if( intersection( cv::Point( 0, 0 ), cv::Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            if( not leftPt1->isFull() )
-            {
-                leftPt1->enqueue( cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ] );
-            }
+            // if( not leftPt1->isFull() )
+            // {
+                f.leftPt1 = cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ];
+            // }
         }
         else
         {
@@ -551,10 +551,10 @@ void LineDetector::findLeftLane( cv::Vec4i left )
         }
         if( intersection( cv::Point( 0, roi.rows - 1 ), cv::Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            if( not leftPt2->isFull() )
-            {
-                leftPt2->enqueue( cv::Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ] );
-            }
+            // if( not leftPt2->isFull() )
+            // {
+                f.leftPt2 = cv::Point( round( ret.x ), round( ret.y ) ) + roiPoints[ 0 ];
+            // }
         }
         else
         {
@@ -563,7 +563,7 @@ void LineDetector::findLeftLane( cv::Vec4i left )
     }
 }
 
-void LineDetector::findRightLane( cv::Vec4i right )
+void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
 {
 
     vector< cv::Vec3f > lines;
@@ -608,10 +608,10 @@ void LineDetector::findRightLane( cv::Vec4i right )
 
         if( intersection( cv::Point( 0, 0 ), cv::Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            if( not rightPt1->isFull() )
-            {
-                rightPt1->enqueue( cv::Point( ret ) + roiPoints[ 0 ] );
-            }
+            // if( not rightPt1->isFull() )
+            // {
+                f.rightPt1 = cv::Point( ret ) + roiPoints[ 0 ];
+            // }
         }
         else
         {
@@ -620,10 +620,10 @@ void LineDetector::findRightLane( cv::Vec4i right )
 
         if( intersection( cv::Point( 0, roi.rows - 1 ), cv::Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            if( not rightPt2->isFull() )
-            {
-                rightPt2->enqueue( cv::Point( ret ) + roiPoints[ 0 ] );
-            }
+            // if( not rightPt2->isFull() )
+            // {
+                f.rightPt2 = cv::Point( ret ) + roiPoints[ 0 ];
+            // }
         }
         else
         {
@@ -660,19 +660,17 @@ void LineDetector::detectCars()
 {
     if( abortS3 )
     {
-        LogDebug( "Aborting %s.", carDetectionThread->getName() );
+        LogDebug( "Aborting carDetection" );
         carDetectionThread->shutdown();
         return;
     }
     sem_wait( semS3 );
 
     cv::Mat carImage;
-    pthread_mutex_lock( &carRingLock );
     if( not p_bufferForCarDetection->isEmpty() )
     {
         carImage = p_bufferForCarDetection->dequeue();
     }
-    pthread_mutex_unlock( &carRingLock );
 
     if( carImage.empty() )
     {
@@ -701,7 +699,8 @@ bool LineDetector::loadClassifier( const cv::String& classifier )
 
 void LineDetector::writeFrameToVideo()
 {
-    myVideoWriter.write( myVehiclesImage );
+    // myVideoWriter.write( myVehiclesImage );
+
 }
 
 void LineDetector::createWindows()

@@ -2,6 +2,7 @@
 #define __RING_BUFFER_HPP__
 
 #include <memory>
+#include <unistd.h>
 
 //! @brief Template Ring Buffer Class
 template < class T >
@@ -19,12 +20,16 @@ class RingBuffer
     //! Create a new Ring_Buffer.
     RingBuffer< T >( size_t maxSize ) :
         buffer( std::unique_ptr< T[] >( new T[ maxSize ] ) ), maxSize( maxSize )
-    { assert( maxSize > 1 && buffer != nullptr ); }
+    {
+        assert( maxSize > 1 && buffer != nullptr );
+        pthread_mutex_init( &lock, NULL );
+    }
 
-    // ~RingBuffer< T >()
-    // {
-    //     delete buffer;
-    // }
+    ~RingBuffer< T >()
+    {
+        pthread_mutex_destroy( &lock );
+        buffer.reset();
+    }
 
     //! @brief Add an item to this ring buffer
     //! @param item
@@ -51,6 +56,9 @@ class RingBuffer
     //! Get the size of the buffer
     //! @returns number of items currently in buffer
     size_t size();
+
+    private:
+    pthread_mutex_t lock;
 };
 
 #endif  // __RING_BUFFER_HPP__

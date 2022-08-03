@@ -134,6 +134,8 @@ int main( int argc, char** argv )
     double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
 
     createSemaphoresAndMutexes();
+    abortS3 = true;
+    // abortS4 = true;
 
     Sequencer* p_sequencer = new Sequencer();
     if( p_sequencer == NULL )
@@ -150,8 +152,6 @@ int main( int argc, char** argv )
                                                  store,
                                                  show );
 
-// abortS3 = true;
-    // abortS4 = true;
     if( p_detector == NULL )
     {
         LogFatal( "Detector creation failed!" );
@@ -186,6 +186,11 @@ int main( int argc, char** argv )
         {
             break;
         }
+        if( not p_detector->isAlive() )
+        {
+            break;
+        }
+
     }
 
     if( p_sequencer )
