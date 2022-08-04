@@ -18,8 +18,12 @@ using namespace std;
 #include "Logger.h"
 #include "RingBuffer.h"
 
-#define RED    (cv::Scalar( 96,  94, 211))
-#define BLUE   (cv::Scalar(203, 147, 114))
+// B   G   R
+#define RED    (cv::Scalar( 51, 51, 255 ))
+#define BLUE   (cv::Scalar( 255, 51, 51 ))
+#define GREEN  (cv::Scalar( 51, 255, 51 ))
+#define YELLOW (cv::Scalar( 51, 255, 255 ))
+#define BLACK  (cv::Scalar( 0, 0, 0 ))
 
 extern pthread_mutex_t rawBufferLock;
 extern pthread_mutex_t carRingLock;
@@ -390,6 +394,7 @@ void LineDetector::annotateImage()
     rectangle( f.currentAnnotatedImage, roiPoints[ 0 ], roiPoints[ 2 ], BLUE, 1, cv::LINE_AA );
     putText( f.currentAnnotatedImage, "ROI", roiPoints[ 0 ], cv::FONT_HERSHEY_SIMPLEX, 0.5, BLUE, 1 );
     rectangle( f.currentAnnotatedImage, carPoints[ 0 ], carPoints[ 2 ], BLUE, 2, cv::LINE_AA );
+
     pthread_mutex_lock( &framesProcessedLock );
     framesProcessed++;
     f.number = framesProcessed;
@@ -474,8 +479,8 @@ void LineDetector::findLeftLane( cv::Vec4i left, frame_s& f )
         30,
         0,
         0,
-        ( 10 ) * ( CV_PI / 180 ),
-        ( 65 ) * ( CV_PI / 180 )
+        ( LEFT_MINIMUM_THETA ) * ( CV_PI / 180 ),
+        ( LEFT_MAXIMUM_THETA ) * ( CV_PI / 180 )
     );
 
     while( !( foundLeft ) && i < lines.size() )
@@ -535,8 +540,8 @@ void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
         30,             // accumulator threshold, only lines >threshold returned
         0,              // srn - set to 0 for classical Hough
         0,              // stn - set to 0 for classical Hough
-        2.007129,       // minimum theta
-        2.967060        // maximum theta
+        ( RIGHT_MINIMUM_THETA ) * ( CV_PI / 180 ),       // minimum theta
+        ( RIGHT_MAXIMUM_THETA ) * ( CV_PI / 180 )        // maximum theta
     );
 
 
