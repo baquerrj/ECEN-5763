@@ -1,7 +1,7 @@
-#ifndef __THREAD_HPP__
-#define __THREAD_HPP__
+#ifndef __THREAD_H__
+#define __THREAD_H__
 
-#include <thread_utils.hpp>
+#include <thread_utils.h>
 #include "Logger.h"
 class ThreadBase
 {
@@ -70,4 +70,4 @@ inline void CyclicThread::shutdown()
         threadIsAlive = false;
     }
 }
-#endif  // __THREAD_HPP__
+#endif  // __THREAD_H__

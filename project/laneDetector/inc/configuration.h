@@ -1,7 +1,7 @@
-#ifndef __CONFIGURATION_HPP__
-#define __CONFIGURATION_HPP__
+#ifndef __CONFIGURATION_H__
+#define __CONFIGURATION_H__
 
-#include <thread_utils.hpp>
+#include <thread_utils.h>
 #include <semaphore.h>
 #include "Logger.h"
 
@@ -135,4 +135,4 @@ extern sem_t* semS4;
 
 extern uint64_t framesProcessed;
 
-#endif // __CONFIGURATION_HPP__
+#endif // __CONFIGURATION_H__

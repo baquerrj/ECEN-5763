@@ -3,10 +3,10 @@
  * @brief This program demonstrates line finding with the Hough transform
  */
 
-#include "lanedetector.hpp"
-#include "configuration.hpp"
-#include "thread.hpp"
-#include "thread_utils.hpp"
+#include "lanedetector.h"
+#include "configuration.h"
+#include "thread.h"
+#include "thread_utils.h"
 #include "string.h"
 #include <unistd.h>
 #include <iostream>

@@ -1,6 +1,6 @@
 #include <RingBuffer.h>
 #include "opencv2/objdetect.hpp"
-#include "lanedetector.hpp"
+#include "lanedetector.h"
 
 template < class T >
 void RingBuffer< T >::enqueue( T item )

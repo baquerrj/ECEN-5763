@@ -1,5 +1,5 @@
-#ifndef __RING_BUFFER_HPP__
-#define __RING_BUFFER_HPP__
+#ifndef __RING_BUFFER_H__
+#define __RING_BUFFER_H__
 
 #include <memory>
 #include <unistd.h>
@@ -61,4 +61,4 @@ class RingBuffer
     pthread_mutex_t lock;
 };
 
-#endif  // __RING_BUFFER_HPP__
+#endif  // __RING_BUFFER_H__

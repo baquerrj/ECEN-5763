@@ -1,5 +1,5 @@
-#ifndef __THREAD_UTILS_HPP__
-#define __THREAD_UTILS_HPP__
+#ifndef __THREAD_UTILS_H__
+#define __THREAD_UTILS_H__
 
 #include <pthread.h>
 #include <string>
@@ -78,4 +78,4 @@ extern const ProcessParams CAPUTRE_PROCESS_PARAMS;
 
 extern const ThreadConfigData CAPTURE_THREAD_CONFIG;
 
-#endif  // __THREAD_UTILS_HPP__
+#endif  // __THREAD_UTILS_H__

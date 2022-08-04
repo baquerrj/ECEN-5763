@@ -1,8 +1,8 @@
 
-#include "lanedetector.hpp"
-#include "thread_utils.hpp"
-#include "thread.hpp"
-#include "configuration.hpp"
+#include "lanedetector.h"
+#include "thread_utils.h"
+#include "thread.h"
+#include "configuration.h"
 
 #include "Logger.h"
 #include "Sequencer.h"

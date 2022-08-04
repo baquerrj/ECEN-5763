@@ -4,12 +4,12 @@
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/time.h>
-#include <thread_utils.hpp>
+#include <thread_utils.h>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <tuple>  // for std::tie
-#include <configuration.hpp>
+#include <configuration.h>
 
 const uint16_t MAX_THREADNAME_LENGTH = 15;  // without '\0'; limit imposed by pthread
 

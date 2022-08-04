@@ -1,10 +1,10 @@
 #include <Sequencer.h>
-#include <configuration.hpp>
+#include <configuration.h>
 #include <fcntl.h>
 #include <Logger.h>
 #include <syslog.h>
-#include <thread.hpp>
-#include <thread_utils.hpp>
+#include <thread.h>
+#include <thread_utils.h>
 
 #define USEC_PER_MSEC ( 1000 )
 #define SEC_TO_MSEC ( 1000 )

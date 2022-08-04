@@ -2,7 +2,7 @@
 #define __SEQUENCER_H__
 
 #include <FrameBase.h>
-#include <configuration.hpp>
+#include <configuration.h>
 #include <semaphore.h>
 
 #include <memory>

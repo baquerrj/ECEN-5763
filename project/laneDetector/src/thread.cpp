@@ -1,6 +1,6 @@
 #include "Logger.h"
 #include <pthread.h>
-#include <thread.hpp>
+#include <thread.h>
 #include "Logger.h"
 ThreadBase::~ThreadBase()
 {}

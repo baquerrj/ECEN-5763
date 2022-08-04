@@ -1,5 +1,5 @@
-#ifndef __LANE_DETECTOR_HPP__
-#define __LANE_DETECTOR_HPP__
+#ifndef __LANE_DETECTOR_H__
+#define __LANE_DETECTOR_H__
 
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
@@ -222,4 +222,4 @@ inline int LineDetector::getFrameHeight()
     return myVideoCapture.get( cv::CAP_PROP_FRAME_HEIGHT );
 }
 
-#endif // __LANE_DETECTOR_HPP__
+#endif // __LANE_DETECTOR_H__
