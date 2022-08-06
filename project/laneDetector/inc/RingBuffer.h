@@ -1,3 +1,13 @@
+/*!
+ * @file RingBuffer.h
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #ifndef __RING_BUFFER_H__
 #define __RING_BUFFER_H__
 
@@ -16,10 +26,11 @@ class RingBuffer
     size_t tail = 0;  //!< Pointer to bottom of buffer
     size_t maxSize;  //!< Maximum number of items ring can hold
     T emptyItem;  //!< used to clear buffer
+    std::string name;
     public:
     //! Create a new Ring_Buffer.
-    RingBuffer< T >( size_t maxSize ) :
-        buffer( std::unique_ptr< T[] >( new T[ maxSize ] ) ), maxSize( maxSize )
+    RingBuffer< T >( size_t maxSize, std::string name ) :
+        buffer( std::unique_ptr< T[] >( new T[ maxSize ] ) ), maxSize( maxSize ), name( name )
     {
         assert( maxSize > 1 && buffer != nullptr );
         pthread_mutex_init( &lock, NULL );
@@ -33,7 +44,7 @@ class RingBuffer
 
     //! @brief Add an item to this ring buffer
     //! @param item
-    void enqueue( T item );
+    bool enqueue( T item );
 
     //! Remove an item from this ring buffer and return it.
     //! @return T

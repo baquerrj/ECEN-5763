@@ -1,3 +1,13 @@
+/*!
+ * @file thread_utils.h
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #ifndef __THREAD_UTILS_H__
 #define __THREAD_UTILS_H__
 

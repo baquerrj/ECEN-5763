@@ -1,16 +1,25 @@
-#include <RingBuffer.h>
+/*!
+ * @file RingBuffer.cpp
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #include "opencv2/objdetect.hpp"
 #include "lanedetector.h"
 
 template < class T >
-void RingBuffer< T >::enqueue( T item )
+bool RingBuffer< T >::enqueue( T item )
 {
     pthread_mutex_lock( &lock );
-    // if buffer is full, throw an error
+    // if buffer is full, return false
     if( isFull() )
     {
         pthread_mutex_unlock( &lock );
-        throw std::runtime_error( "buffer is full" );
+        return false;
     }
     // insert item at back of buffer
     buffer[ tail ] = item;
@@ -18,6 +27,7 @@ void RingBuffer< T >::enqueue( T item )
     // increment tail
     tail = ( tail + 1 ) % maxSize;
     pthread_mutex_unlock( &lock );
+    return true;
 }
 
 // Remove an item from this circular buffer and return it.
@@ -29,7 +39,7 @@ T RingBuffer< T >::dequeue()
     if( isEmpty() )
     {
         pthread_mutex_unlock( &lock );
-        throw std::runtime_error( "buffer is empty" );
+        throw std::runtime_error( name + ": buffer is empty" );
     }
 
     // get item at head
@@ -87,28 +97,28 @@ size_t RingBuffer< T >::size()
     return _size;
 }
 
-template void RingBuffer< cv::Mat >::enqueue( cv::Mat item );
+template bool RingBuffer< cv::Mat >::enqueue( cv::Mat item );
 template cv::Mat RingBuffer< cv::Mat >::dequeue();
 template cv::Mat RingBuffer< cv::Mat >::front();
 template bool RingBuffer< cv::Mat >::isEmpty();
 template bool RingBuffer< cv::Mat >::isFull();
 template size_t RingBuffer< cv::Mat >::size();
 
-template void RingBuffer< cv::Point >::enqueue( cv::Point item );
+template bool RingBuffer< cv::Point >::enqueue( cv::Point item );
 template cv::Point RingBuffer< cv::Point >::dequeue();
 template cv::Point RingBuffer< cv::Point >::front();
 template bool RingBuffer< cv::Point >::isEmpty();
 template bool RingBuffer< cv::Point >::isFull();
 template size_t RingBuffer< cv::Point >::size();
 
-template void RingBuffer< std::vector< cv::Rect> >::enqueue( std::vector< cv::Rect> item );
+template bool RingBuffer< std::vector< cv::Rect> >::enqueue( std::vector< cv::Rect> item );
 template std::vector< cv::Rect> RingBuffer< std::vector< cv::Rect> >::dequeue();
 template std::vector< cv::Rect> RingBuffer< std::vector< cv::Rect> >::front();
 template bool RingBuffer< std::vector< cv::Rect> >::isEmpty();
 template bool RingBuffer< std::vector< cv::Rect> >::isFull();
 template size_t RingBuffer< std::vector< cv::Rect> >::size();
 
-template void RingBuffer< LineDetector::frame_s >::enqueue( LineDetector::frame_s item );
+template bool RingBuffer< LineDetector::frame_s >::enqueue( LineDetector::frame_s item );
 template LineDetector::frame_s RingBuffer< LineDetector::frame_s >::dequeue();
 template LineDetector::frame_s RingBuffer< LineDetector::frame_s >::front();
 template bool RingBuffer< LineDetector::frame_s >::isEmpty();

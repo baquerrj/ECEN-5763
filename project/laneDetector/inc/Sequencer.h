@@ -1,3 +1,13 @@
+/*!
+ * @file Sequencer.h
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #ifndef __SEQUENCER_H__
 #define __SEQUENCER_H__
 

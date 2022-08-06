@@ -1,6 +1,14 @@
-//
-// Created by Nadrino on 24/08/2020.
-//
+/*!
+ * @file Logger.h
+ * @author Nadrino
+ * @brief
+ * @version 1.0
+ * @date 224/08/2020.
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
+
 
 #ifndef SIMPLE_CPP_LOGGER_LOGGER_H
 #define SIMPLE_CPP_LOGGER_LOGGER_H

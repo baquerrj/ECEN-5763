@@ -1,8 +1,13 @@
-/**
- * @file houghclines.cpp
- * @brief This program demonstrates line finding with the Hough transform
+/*!
+ * @file lanedetector.cpp
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
  */
-
 #include "lanedetector.h"
 #include "configuration.h"
 #include "thread.h"
@@ -46,8 +51,6 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     foundLeft( false ),
     foundRight( false ),
     myCreatedOk( true ),
-    lanesReady( false ),
-    carsReady( false ),
     myFrameWidth( frameWidth ),
     myFrameHeight( frameHeight ),
     myDeviceId( deviceId ),
@@ -55,6 +58,9 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     carsDeltaTimes( 0.0 ),
     lanesDeltaTimes( 0.0 ),
     annotationDeltaTimes( 0.0 ),
+    carsDetected( 0 ),
+    leftLanesDetected( 0 ),
+    rightLanesDetected( 0 ),
     carsThreadFrames( 0 ),
     lanesThreadFrames( 0 ),
     annotationThreadFrames( 0 ),
@@ -91,12 +97,9 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
         createWindows();
     }
 
-    p_myRawBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
-    p_bufferForCarDetection = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
-    p_myReadyToAnnotateBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE );
-
-    p_myFinalBuffer = new RingBuffer< frame_s >( RING_BUFFER_SIZE );
-    frames = new RingBuffer < frame_s >( 100 );
+    p_myRawBuffer = new RingBuffer< cv::Mat >( RING_BUFFER_SIZE, "rawBuffer" );
+    p_myFinalBuffer = new RingBuffer< frame_s >( RING_BUFFER_SIZE , "finalBuffer" );
+    frames = new RingBuffer < frame_s >( RING_BUFFER_SIZE, "annotationBuffer" );
 
     if( saveFrames )
     {
@@ -200,19 +203,34 @@ void LineDetector::printFrameRates()
 {
     double lanesDeltaTimesMs = lanesDeltaTimes / lanesThreadFrames;
     double lanesDeltaTimeS = lanesDeltaTimesMs / 1000.0;
+    double carsDeltaTimesMs = carsDeltaTimes / carsThreadFrames;
+    double carsDeltaTimeS = carsDeltaTimesMs / 1000.0;
+    double annotationDeltaTimesMs = annotationDeltaTimes / annotationThreadFrames;
+    double annotationDeltaTimeS = annotationDeltaTimesMs / 1000.0;
+
     printf( "**** LANE DETECTION ****\n\r" );
     printf( "Frames Processed: %ld\n\r", lanesThreadFrames );
     printf( "Average Lane Detection Frame Rate: %3.2f ms per frame\n\r", lanesDeltaTimesMs );
     printf( "Average Lane Detection Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / lanesDeltaTimeS );
+    printf( "Number of Left Lanes Detected: %ld\n\r", leftLanesDetected );
+    printf( "Number of Right Lanes Detected: %ld\n\r", rightLanesDetected );
+    printf( "Number of Lanes Detected: %ld\n\r", leftLanesDetected + rightLanesDetected );
     printf( "**** LANE DETECTION ****\n\r" );
 
-    double carsDeltaTimesMs = carsDeltaTimes / carsThreadFrames;
-    double carsDeltaTimeS = carsDeltaTimesMs / 1000.0;
     printf( "**** CAR DETECTION ****\n\r" );
     printf( "Frames Processed: %ld\n\r", carsThreadFrames );
-    printf( "Average Lane Detection Frame Rate: %3.2f ms per frame\n\r", carsDeltaTimesMs );
-    printf( "Average Lane Detection Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / carsDeltaTimeS );
+    printf( "Average Car Detection Frame Rate: %3.2f ms per frame\n\r", carsDeltaTimesMs );
+    printf( "Average Car Detection Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / carsDeltaTimeS );
+    printf( "Number of Cars Detected: %ld\n\r", carsDetected );
     printf( "**** CAR DETECTION ****\n\r" );
+
+
+    printf( "**** IMAGE ANNOTATION ****\n\r" );
+    printf( "Frames Processed: %ld\n\r", annotationThreadFrames );
+    printf( "Average Image Annotation Frame Rate: %3.2f ms per frame\n\r", annotationDeltaTimesMs );
+    printf( "Average Image Annotation Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / annotationDeltaTimeS );
+    printf( "**** IMAGE ANNOTATION ****\n\r" );
+
 }
 
 LineDetector::~LineDetector()
@@ -264,12 +282,6 @@ LineDetector::~LineDetector()
         p_myRawBuffer = NULL;
     }
 
-    if( p_bufferForCarDetection )
-    {
-        delete p_bufferForCarDetection;
-        p_bufferForCarDetection = NULL;
-    }
-
     if( p_myFinalBuffer )
     {
         delete p_myFinalBuffer;
@@ -314,7 +326,7 @@ void LineDetector::readFrame()
     p_myRawBuffer->enqueue( tmp );
 }
 
-void LineDetector::showLanesImage()
+void LineDetector::updateDisplayWindow()
 {
     if( p_myFinalBuffer->isEmpty() )
     {
@@ -357,6 +369,7 @@ void LineDetector::annotateImage()
         return;
     }
     sem_wait( semS4 );
+    clock_gettime( CLOCK_REALTIME, &annotationStart );
 
     if( frames->isEmpty() )
     {
@@ -372,6 +385,7 @@ void LineDetector::annotateImage()
         LogTrace( "Annotating cars on image (frame #%ld)!", framesProcessed );
         for( size_t i = 0; i < f.vehicle.size(); ++i )
         {
+            carsDetected++;
             cv::Point rect[ 2 ];
             rect[ 0 ].x = f.vehicle[ i ].x;
             rect[ 0 ].y = f.vehicle[ i ].y + 380;
@@ -383,11 +397,13 @@ void LineDetector::annotateImage()
 
     if( foundLeft )
     {
+        leftLanesDetected++;
         line( f.currentAnnotatedImage, f.leftPt1, f.leftPt2, RED, 2, cv::LINE_4 );
     }
 
     if( foundRight )
     {
+        rightLanesDetected++;
         line( f.currentAnnotatedImage, f.rightPt1, f.rightPt2, RED, 2, cv::LINE_4 );
     }
 
@@ -404,6 +420,10 @@ void LineDetector::annotateImage()
         usleep( 1 );
     }
     p_myFinalBuffer->enqueue( f );
+
+    clock_gettime( CLOCK_REALTIME, &annotationStop );
+    annotationThreadFrames++;
+    annotationDeltaTimes += delta_t( &annotationStop, &annotationStart );
 }
 
 void* LineDetector::executeCar( void* context )
@@ -453,12 +473,14 @@ void LineDetector::detectLanes()
     foundLeft = false;
     foundRight = false;
 
-    pthread_mutex_lock( &frameLock );
     findLeftLane( left, f );
     findRightLane( right, f );
     f.currentRawImage = raw;
     frames->enqueue( f );
-    pthread_mutex_unlock( &frameLock );
+    // {
+    //     // keep trying to enqueue until successful
+    //     usleep( 5 );
+    // }
     pthread_mutex_unlock( &roiLock );
 
     clock_gettime( CLOCK_REALTIME, &lanesStop );
@@ -630,12 +652,11 @@ void LineDetector::detectCars()
 
     std::vector< cv::Rect > tmpVehicle;
 
-    pthread_mutex_lock( &frameLock );
     if( frames->isEmpty() )
     {
-        pthread_mutex_unlock( &frameLock );
         return;
     }
+    pthread_mutex_lock( &frameLock );
     frame_s f = frames->dequeue();
     if( f.currentRawImage.empty() )
     {
@@ -650,7 +671,7 @@ void LineDetector::detectCars()
         cv::Mat carImageHalf = carImage( cv::Rect( carPoints[ 0 ], carPoints[ 2 ] ) );
         cv::Mat gray;
         cv::cvtColor( carImageHalf, gray, cv::COLOR_BGR2GRAY );
-        myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 4, 0, cv::Size( 16, 16 ), gray.size() );
+        myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 3, 0, cv::Size( 2, 2 ), gray.size() );
     }
 
     if( tmpVehicle.size() == 0 )

@@ -1,4 +1,13 @@
-
+/*!
+ * @file main.cpp
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #include "lanedetector.h"
 #include "thread_utils.h"
 #include "thread.h"
@@ -178,7 +187,7 @@ int main( int argc, char** argv )
 
     while( true )
     {
-        p_detector->showLanesImage();
+        p_detector->updateDisplayWindow();
 
         if( doStore )
         {

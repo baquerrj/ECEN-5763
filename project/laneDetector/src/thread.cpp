@@ -1,4 +1,14 @@
-#include "Logger.h"
+
+/*!
+ * @file thread.cpp
+ * @author Roberto J Baquerizo (roba8460@colorado.edu)
+ * @brief
+ * @version 1.0
+ * @date 2022-08-05
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #include <pthread.h>
 #include <thread.h>
 #include "Logger.h"
