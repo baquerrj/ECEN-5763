@@ -61,8 +61,8 @@ const int CPU_SIGN_DETECTION = 3;
 const int CPU_ANNOTATION = 3;
 
 static const ProcessParams sequencerParams = {
-    cpuSequencer,
-    SCHED_RR,
+    CPU_SEQUENCER,
+    SCHED_FIFO,
     99,
     0 };
 
@@ -72,8 +72,8 @@ static const ThreadConfigData sequencerThreadConfig = {
     sequencerParams };
 
 static const ProcessParams captureParams = {
-    cpuCapture,
-    SCHED_RR,
+    CPU_CAPTURE,
+    SCHED_FIFO,
     98,
     0};
 
@@ -83,8 +83,8 @@ static const ThreadConfigData captureThreadConfig = {
     captureParams};
 
 static const ProcessParams laneDetectionParams = {
-    cpuLaneDetection,
-    SCHED_RR,
+    CPU_LANE_DETECTION,
+    SCHED_FIFO,
     99,
     0};
 
@@ -94,8 +94,8 @@ static const ThreadConfigData laneDetectionThreadConfig = {
     laneDetectionParams};
 
 static const ProcessParams carDetectionParams = {
-    cpuCarDetection,  // CPU1
-    SCHED_RR,
+    CPU_CAR_DETECTION,  // CPU1
+    SCHED_FIFO,
     99,  // highest priority
     0};
 
@@ -104,20 +104,9 @@ static const ThreadConfigData carDetectionThreadConfig = {
     "carDetection",
     carDetectionParams};
 
-static const ProcessParams signDetectionParams = {
-    cpuSignDetection,
-    SCHED_RR,
-    99,
-    0};
-
-static const ThreadConfigData signDetectionThreadConfig = {
-    true,
-    "signDetection",
-    signDetectionParams};
-
 static const ProcessParams annotationParams = {
-    cpuAnnotation,
-    SCHED_RR,
+    CPU_ANNOTATION,
+    SCHED_FIFO,
     99,
     0 };
 

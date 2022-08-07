@@ -48,29 +48,6 @@ const ProcessParams DEFAULT_PROCESS_PARAMS = {
 
 const ProcessParams VOID_PROCESS_PARAMS = { 0, 0, 0, 0 };
 
-const ProcessParams CAPTURE_PROCESS_PARAMS = {
-    CPU_CAPTURE,
-    POLICY_ID[ 2 ],
-    1,
-    1
-};
-
-const ThreadConfigData CAPTURE_THREAD_CONFIG = {
-    true,
-    "captureThread",
-    CAPTURE_PROCESS_PARAMS
-};
-
-
-int numCpus = NUM_CPUS;
-int cpuMain = CPU_MAIN;
-int cpuSequencer = CPU_MAIN;
-int cpuCapture = CPU_CAPTURE;
-int cpuLaneDetection = CPU_LANE_DETECTION;
-int cpuSignDetection = CPU_SIGN_DETECTION;
-int cpuCarDetection = CPU_CAR_DETECTION;
-int cpuAnnotation = CPU_ANNOTATION;
-
 static bool name_is_valid( const std::string name );
 
 bool ThreadConfigData::operator==( const ThreadConfigData& that ) const

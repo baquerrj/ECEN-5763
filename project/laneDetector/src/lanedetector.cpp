@@ -39,6 +39,7 @@ const cv::String LineDetector::DETECTED_LANES_IMAGE = "Detected Lanes (in red)";
 const cv::String LineDetector::DETECTED_VEHICLES_IMAGE = "Detected Vehicles";
 const cv::String LineDetector::CAR_CLASSIFIER = "cars.xml";
 
+static struct timespec delayTime = {0, 1000 };
 
 LineDetector::LineDetector( const ThreadConfigData* configData,
                             int deviceId,
@@ -299,7 +300,7 @@ void LineDetector::readFrame()
 {
     if( abortS1 )
     {
-        LogDebug( "Aborting %s.", captureThread->getName() );
+        LogDebug( "Aborting carCapture" );
         captureThread->shutdown();
         return;
     }
@@ -375,13 +376,21 @@ void LineDetector::annotateImage()
     {
         return;
     }
-    pthread_mutex_lock( &frameLock );
-    frame_s f = frames->dequeue();
-    pthread_mutex_unlock( &frameLock );
+    frame_s f;
+    try
+    {
+        f = frames->dequeue();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return;
+    }
+
     f.currentAnnotatedImage = f.currentRawImage.clone();
 
-    if( carDetectionThread->isThreadAlive() and f.vehicle.size() != 0 )
-    {
+    // if( carDetectionThread->isThreadAlive() and f.vehicle.size() != 0 )
+    // {
         LogTrace( "Annotating cars on image (frame #%ld)!", framesProcessed );
         for( size_t i = 0; i < f.vehicle.size(); ++i )
         {
@@ -393,8 +402,17 @@ void LineDetector::annotateImage()
             rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + 380;
             rectangle( f.currentAnnotatedImage, rect[ 0 ], rect[ 1 ], CV_RGB( 255, 0, 0 ), 3 );
         }
-    }
+    // }
 
+        // cv::Rect rect;
+        // rect = f.vehicle[ i ] + carPoints[ 0 ];
+        // // rect[ 1 ] = f.vehicle[ i ] + carPoints[ 0 ];
+        // // rect[ 0 ].x = f.vehicle[ i ].x;
+        // // rect[ 0 ].y = f.vehicle[ i ].y + carPoints[ 0 ].y;
+        // // rect[ 1 ].x = f.vehicle[ i ].x + f.vehicle[ i ].width;
+        // // rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + carPoints[ 0 ].y;
+        // // rectangle( f.currentAnnotatedImage, rect, CV_RGB( 255, 0, 0 ), 3 );
+        // rectangle( f.currentAnnotatedImage, f.vehicle[ i ], CV_RGB( 255, 0, 0 ), 3 );
     if( foundLeft )
     {
         leftLanesDetected++;
@@ -417,7 +435,7 @@ void LineDetector::annotateImage()
     pthread_mutex_unlock( &framesProcessedLock );
     while( p_myFinalBuffer->isFull() )
     {
-        usleep( 1 );
+        nanosleep( &delayTime, NULL );
     }
     p_myFinalBuffer->enqueue( f );
 
@@ -473,14 +491,12 @@ void LineDetector::detectLanes()
     foundLeft = false;
     foundRight = false;
 
+    pthread_mutex_lock( &frameLock );
     findLeftLane( left, f );
     findRightLane( right, f );
     f.currentRawImage = raw;
     frames->enqueue( f );
-    // {
-    //     // keep trying to enqueue until successful
-    //     usleep( 5 );
-    // }
+    pthread_mutex_unlock( &frameLock );
     pthread_mutex_unlock( &roiLock );
 
     clock_gettime( CLOCK_REALTIME, &lanesStop );
@@ -594,7 +610,7 @@ void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
 
         if( intersection( cv::Point( 0, 0 ), cv::Point( 1, 0 ), pt1, pt2, ret ) )
         {
-            f.rightPt1 = cv::Point( ret ) + roiPoints[ 0 ];
+            f.rightPt1 = cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ];
         }
         else
         {
@@ -603,7 +619,7 @@ void LineDetector::findRightLane( cv::Vec4i right, frame_s& f )
 
         if( intersection( cv::Point( 0, roi.rows - 1 ), cv::Point( 1, roi.rows - 1 ), pt1, pt2, ret ) )
         {
-            f.rightPt2 = cv::Point( ret ) + roiPoints[ 0 ];
+            f.rightPt2 = cv::Point( std::round( ret.x ), std::round( ret.y ) ) + roiPoints[ 0 ];
         }
         else
         {
@@ -671,7 +687,8 @@ void LineDetector::detectCars()
         cv::Mat carImageHalf = carImage( cv::Rect( carPoints[ 0 ], carPoints[ 2 ] ) );
         cv::Mat gray;
         cv::cvtColor( carImageHalf, gray, cv::COLOR_BGR2GRAY );
-        myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 3, 0, cv::Size( 2, 2 ), gray.size() );
+        // myClassifier.detectMultiScale( gray, tmpVehicle, 1.2, 3, 0, cv::Size( 2, 2 ), gray.size() );
+        myClassifier.detectMultiScale( gray, tmpVehicle );
     }
 
     if( tmpVehicle.size() == 0 )

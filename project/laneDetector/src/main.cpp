@@ -189,10 +189,10 @@ int main( int argc, char** argv )
     {
         p_detector->updateDisplayWindow();
 
-        if( doStore )
-        {
-            p_detector->writeFrameToVideo();
-        }
+        // if( doStore )
+        // {
+        //     p_detector->writeFrameToVideo();
+        // }
 
         winInput = cv::waitKey( 30 );
         if( winInput == 27 )

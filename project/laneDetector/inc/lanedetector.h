@@ -47,7 +47,7 @@ class LineDetector
     static const cv::String DETECTED_VEHICLES_IMAGE;
     static const cv::String CAR_CLASSIFIER;
 
-    static const int RING_BUFFER_SIZE = 150;    //!< Defines buffer size for ring buffers
+    static const int RING_BUFFER_SIZE = 300;    //!< Defines buffer size for ring buffers
 
     static const int DEFAULT_FRAME_WIDTH = 1280;    //!< Default frame width
     static const int DEFAULT_FRAME_HEIGHT = 720;    //!< Default frame height
