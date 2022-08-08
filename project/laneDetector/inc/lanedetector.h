@@ -18,6 +18,7 @@
 
 #include <semaphore.h>
 #include "RingBuffer.h"
+#include "Logger.h"
 
  // Forward declarartions
 class CyclicThread;
@@ -39,6 +40,16 @@ class LineDetector
         cv::Point rightPt2;             //!< Point 2 defining the right lane
         std::vector< cv::Rect > vehicle;    //!< Vector of detected vehicles
         uint64_t number;                //!< Frame numbers, 0th frame, 1st frame, etc.
+        bool carsDone;
+        bool lanesDone;
+
+        frame_s()
+        {
+            currentRawImage = cv::Mat();
+            currentAnnotatedImage = cv::Mat();
+            carsDone = false;
+            lanesDone = false;
+        }
     };
 
     public:
@@ -164,6 +175,89 @@ class LineDetector
     static void* executeCar( void* context );
     static void* executeAnnotation( void* context );
 
+    /*!
+     * @brief Check for exit conditions
+     *
+     * @return true
+     * @return false
+     */
+    inline bool isDone()
+    {
+        if( endOfVideoReached )
+        {
+            // we have reached the end of the video, i.e. there are no more frames to process
+            if( saveFrames and not showWindows )
+            {
+                if( numberOfFramesWritten >= numberOfFramesProcessed and numberOfFramesWritten >= annotationThreadFrames )
+                {
+                    LogInfo( "frames written %ld >= %ld frames processed", numberOfFramesWritten, numberOfFramesProcessed );
+                    LogInfo( "frames written %ld >= %ld frames annotated", numberOfFramesWritten, annotationThreadFrames );
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else if( not saveFrames and showWindows )
+            {
+                if( numberOfFramesUpdated >= numberOfFramesProcessed and numberOfFramesUpdated >= annotationThreadFrames )
+                {
+                    LogInfo( "frames updated %ld >= %ld frames processed", numberOfFramesUpdated, numberOfFramesProcessed );
+                    LogInfo( "frames updated %ld >= %ld frames annotated", numberOfFramesUpdated, annotationThreadFrames );
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else if( saveFrames and showWindows )
+            {
+                if( ( numberOfFramesUpdated >= numberOfFramesProcessed and numberOfFramesUpdated >= annotationThreadFrames ) and
+                    ( numberOfFramesWritten >= numberOfFramesProcessed and numberOfFramesWritten >= annotationThreadFrames )
+                    )
+                {
+                    LogInfo( "frames updated %ld >= %ld frames processed", numberOfFramesUpdated, numberOfFramesProcessed );
+                    LogInfo( "frames updated %ld >= %ld frames annotated", numberOfFramesUpdated, annotationThreadFrames );
+                    LogInfo( "frames written %ld >= %ld frames processed", numberOfFramesWritten, numberOfFramesProcessed );
+                    LogInfo( "frames written %ld >= %ld frames annotated", numberOfFramesWritten, annotationThreadFrames );
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    inline uint64_t getNumberOfAnnotations()
+    {
+        return annotationThreadFrames;
+    }
+
+    inline bool endOfVideo()
+    {
+        return endOfVideoReached;
+    }
+
+    inline uint64_t getNumberOfFramesUpdated()
+    {
+        return numberOfFramesUpdated;
+    }
+
+    inline uint64_t getNumberOfFramesWritten()
+    {
+        return numberOfFramesWritten;
+    }
+
+    inline uint64_t getNumberOfFramesProcessed()
+    {
+        return numberOfFramesProcessed;
+    }
 
     private:
     bool foundLeft;
@@ -177,6 +271,7 @@ class LineDetector
     double carsDeltaTimes;
     double lanesDeltaTimes;
     double annotationDeltaTimes;
+    bool endOfVideoReached;
 
     uint64_t carsDetected;
     uint64_t leftLanesDetected;
@@ -198,7 +293,14 @@ class LineDetector
     struct timespec annotationStart;
     struct timespec annotationStop;
 
+    uint64_t numberOfFramesRead;
     uint16_t numberOfEmptyFrames;
+    uint64_t numberOfFramesUpdated;
+    uint64_t numberOfFramesWritten;
+    uint64_t numberOfFramesProcessed;
+    uint64_t annotationExecutions;
+    uint64_t carExecutions;
+    uint64_t laneExecutions;
 
     cv::VideoCapture myVideoCapture;
     // cv::VideoWriter myVideoWriter;

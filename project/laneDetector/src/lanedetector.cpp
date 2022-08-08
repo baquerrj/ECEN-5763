@@ -56,9 +56,11 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     myFrameHeight( frameHeight ),
     myDeviceId( deviceId ),
     showWindows( showWindows ),
+    saveFrames( saveFrames ),
     carsDeltaTimes( 0.0 ),
     lanesDeltaTimes( 0.0 ),
     annotationDeltaTimes( 0.0 ),
+    endOfVideoReached( false ),
     carsDetected( 0 ),
     leftLanesDetected( 0 ),
     rightLanesDetected( 0 ),
@@ -73,7 +75,14 @@ LineDetector::LineDetector( const ThreadConfigData* configData,
     lanesStop( { 0,0 } ),
     annotationStart( { 0,0 } ),
     annotationStop( { 0,0 } ),
-    numberOfEmptyFrames( 0 )
+    numberOfFramesRead( 0 ),
+    numberOfEmptyFrames( 0 ),
+    numberOfFramesUpdated( 0 ),
+    numberOfFramesWritten(0),
+    numberOfFramesProcessed( 0),
+    annotationExecutions( 0 ),
+    carExecutions( 0 ),
+    laneExecutions( 0 )
 {
     myVideoCapture = cv::VideoCapture( myVideoFilename );
 
@@ -232,6 +241,10 @@ void LineDetector::printFrameRates()
     printf( "Average Image Annotation Frame Rate: %3.2f frames per sec (fps)\n\r", 1.0 / annotationDeltaTimeS );
     printf( "**** IMAGE ANNOTATION ****\n\r" );
 
+    printf( "ANNOTATION: released %ld times\n\r", annotationExecutions );
+    printf( "CAR DETECTION: released %ld times\n\r", carExecutions );
+    printf( "LANE DETECTION: released %ld times\n\r", laneExecutions );
+
 }
 
 LineDetector::~LineDetector()
@@ -304,13 +317,13 @@ void LineDetector::readFrame()
         captureThread->shutdown();
         return;
     }
+    if( endOfVideoReached )
+    {
+        return;
+    }
     if( numberOfEmptyFrames >= EMPTY_FRAMES_PERSISTENCY_CHECK )
     {
-        abortS1 = true;
-        abortS2 = true;
-        abortS3 = true;
-        abortS4 = true;
-        abortSequencer = true;
+        endOfVideoReached = true;
         return;
     }
     sem_wait( semS1 );
@@ -324,7 +337,11 @@ void LineDetector::readFrame()
     {
         numberOfEmptyFrames++;
     }
-    p_myRawBuffer->enqueue( tmp );
+    else
+    {
+        p_myRawBuffer->enqueue( tmp );
+        numberOfFramesRead++;
+    }
 }
 
 void LineDetector::updateDisplayWindow()
@@ -338,6 +355,7 @@ void LineDetector::updateDisplayWindow()
     if( showWindows )
     {
         cv::imshow( DETECTED_LANES_IMAGE, image );
+        numberOfFramesUpdated++;
     }
 
     if( saveFrames )
@@ -346,6 +364,7 @@ void LineDetector::updateDisplayWindow()
         sprintf( filepath, "%s/%08ld.jpg", myOutputDirectory.c_str(), f.number );
         LogTrace( "writing %s", filepath );
         cv::imwrite( std::string( filepath ), image );
+        numberOfFramesWritten++;
     }
 }
 
@@ -370,28 +389,41 @@ void LineDetector::annotateImage()
         return;
     }
     sem_wait( semS4 );
+    annotationExecutions++;
     clock_gettime( CLOCK_REALTIME, &annotationStart );
 
     if( frames->isEmpty() )
     {
         return;
     }
+    pthread_mutex_lock( &frameLock );
     frame_s f;
     try
     {
-        f = frames->dequeue();
+        f = frames->front();
     }
     catch(const std::exception& e)
     {
+        pthread_mutex_unlock( &frameLock );
         std::cerr << e.what() << '\n';
         return;
     }
 
+    if( ( f.carsDone == false ) or ( f.lanesDone == false ) )
+    {
+        pthread_mutex_unlock( &frameLock );
+        LogTrace( "Either cars or lanes not done yet!" );
+        return;
+    }
+
+    f = frames->dequeue();
+    pthread_mutex_unlock( &frameLock );
+
     f.currentAnnotatedImage = f.currentRawImage.clone();
 
-    // if( carDetectionThread->isThreadAlive() and f.vehicle.size() != 0 )
-    // {
-        LogTrace( "Annotating cars on image (frame #%ld)!", framesProcessed );
+    if( f.vehicle.size() != 0 )
+    {
+        LogTrace( "Annotating cars on image (frame #%ld)!", numberOfFramesProcessed );
         for( size_t i = 0; i < f.vehicle.size(); ++i )
         {
             carsDetected++;
@@ -402,17 +434,7 @@ void LineDetector::annotateImage()
             rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + 380;
             rectangle( f.currentAnnotatedImage, rect[ 0 ], rect[ 1 ], CV_RGB( 255, 0, 0 ), 3 );
         }
-    // }
-
-        // cv::Rect rect;
-        // rect = f.vehicle[ i ] + carPoints[ 0 ];
-        // // rect[ 1 ] = f.vehicle[ i ] + carPoints[ 0 ];
-        // // rect[ 0 ].x = f.vehicle[ i ].x;
-        // // rect[ 0 ].y = f.vehicle[ i ].y + carPoints[ 0 ].y;
-        // // rect[ 1 ].x = f.vehicle[ i ].x + f.vehicle[ i ].width;
-        // // rect[ 1 ].y = f.vehicle[ i ].y + f.vehicle[ i ].height + carPoints[ 0 ].y;
-        // // rectangle( f.currentAnnotatedImage, rect, CV_RGB( 255, 0, 0 ), 3 );
-        // rectangle( f.currentAnnotatedImage, f.vehicle[ i ], CV_RGB( 255, 0, 0 ), 3 );
+    }
     if( foundLeft )
     {
         leftLanesDetected++;
@@ -431,6 +453,7 @@ void LineDetector::annotateImage()
 
     pthread_mutex_lock( &framesProcessedLock );
     framesProcessed++;
+    numberOfFramesProcessed++;
     f.number = framesProcessed;
     pthread_mutex_unlock( &framesProcessedLock );
     while( p_myFinalBuffer->isFull() )
@@ -461,6 +484,7 @@ void LineDetector::detectLanes()
         return;
     }
     sem_wait( semS2 );
+    laneExecutions++;
     clock_gettime( CLOCK_REALTIME, &lanesStart );
     if( p_myRawBuffer->isEmpty() )
     {
@@ -495,6 +519,11 @@ void LineDetector::detectLanes()
     findLeftLane( left, f );
     findRightLane( right, f );
     f.currentRawImage = raw;
+    f.lanesDone = true;
+    if( f.carsDone and f.lanesDone )
+    {
+        sem_post( semS4 );
+    }
     frames->enqueue( f );
     pthread_mutex_unlock( &frameLock );
     pthread_mutex_unlock( &roiLock );
@@ -661,6 +690,7 @@ void LineDetector::detectCars()
         return;
     }
     sem_wait( semS3 );
+    carExecutions++;
     clock_gettime( CLOCK_REALTIME, &carsStart );
 
     cv::Mat raw;
@@ -703,13 +733,17 @@ void LineDetector::detectCars()
         // we don't have any items in vehicle vector
         f.vehicle = tmpVehicle;
     }
+    f.carsDone = true;
+    if( f.carsDone and f.lanesDone )
+    {
+        sem_post( semS4 );
+    }
     frames->enqueue( f );
     pthread_mutex_unlock( &frameLock );
 
     clock_gettime( CLOCK_REALTIME, &carsStop );
     carsThreadFrames++;
     carsDeltaTimes += delta_t( &carsStop, &carsStart );
-    sem_post( semS4 );
 }
 
 bool LineDetector::loadClassifier( const cv::String& classifier )

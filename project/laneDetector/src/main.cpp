@@ -88,7 +88,7 @@ static void createSemaphoresAndMutexes()
         semS4 = sem_open( SEMS4_NAME, O_CREAT | O_EXCL, 0644, 0 );
         if( semS4 == SEM_FAILED )
         {
-            perror( "Failed to initialize S3 semaphore" );
+            perror( "Failed to initialize S4 semaphore" );
             exit( -1 );
         }
     }
@@ -97,7 +97,7 @@ static void createSemaphoresAndMutexes()
 static const char* keys = {
     "{help          h|false|show help message}"
     "{@input         |./videos/22400003.AVI|path to test video to process}"
-    "{store          ||path to create processed output video}"
+    "{store          |./outputFrames/|path to create processed output video}"
     "{show           |false|show intermediate steps}"
 };
 
@@ -142,14 +142,10 @@ int main( int argc, char** argv )
     {
         LogInfo( "Using %s as source", videoInput.c_str() );
     }
-    // pthread_mutex_init( &grayscaleBufferLock, NULL );
-    // pthread_mutex_init( &framesProcessedLock, NULL );
 
     double sequencerDeadline = 1 / ( double )Sequencer::SEQUENCER_FREQUENCY;
 
     createSemaphoresAndMutexes();
-    // abortS3 = true;
-    // abortS4 = true;
 
     Sequencer* p_sequencer = new Sequencer();
     if( p_sequencer == NULL )
@@ -189,21 +185,21 @@ int main( int argc, char** argv )
     {
         p_detector->updateDisplayWindow();
 
-        // if( doStore )
-        // {
-        //     p_detector->writeFrameToVideo();
-        // }
-
-        winInput = cv::waitKey( 30 );
+        winInput = cv::waitKey( 10 );
         if( winInput == 27 )
         {
+            LogInfo( "User requested exit!" );
             break;
         }
         if( not p_detector->isAlive() )
         {
+            LogInfo( "Detector shut down!" );
             break;
         }
-
+        if( p_detector->isDone () )
+        {
+            break;
+        }
     }
 
     if( p_sequencer )

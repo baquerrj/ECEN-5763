@@ -145,11 +145,12 @@ void Sequencer::sequenceServices()
         }
 
         // Servcie_4 = RT_MIN	@ CAPTURE_FREQUENCY (0.1Hz or 1Hz)
-        // if( not abortS4 and ( count % S2_COUNT ) == 0 )
+        // if( not abortS4 and ( count % FULL_PERIOD ) == 0 )
         // {
         //     syslog( LOG_INFO, "S4 Release at %llu   Time: %lf seconds\n", count, startTimes[ count ] );
         //     sem_post( semS4 );
         // }
+
 
         clock_gettime( CLOCK_REALTIME, &end );
         endTimes[ count ] = ( ( double )end.tv_sec + ( double )( ( end.tv_nsec ) / ( double )1000000000 ) );
